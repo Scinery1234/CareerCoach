@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Purposefields Wayfinder</title>
+<meta name="description" content="Work out a career direction that fits your whole life: values, strengths, ideas and three small first steps.">
+<meta name="theme-color" content="#eef4f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1a1f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/styles.css">
+<script src="/vendor/Sortable.min.js" defer></script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="top">
+  <div class="gut">
+    <div class="hrow">
+      <div class="brand"><span class="eyebrow">Purposefields</span><h1>Wayfinder</h1></div>
+      <div class="hbtns">
+        <button class="ghost" id="restart" type="button">Start over</button>
+        <button class="help" id="helpBtn" type="button">Help now</button>
+      </div>
+    </div>
+    <nav class="steps" id="steps" aria-label="Steps"></nav>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabWork" aria-selected="true">This step</button>
+      <button type="button" role="tab" id="tabTalk" aria-selected="false">Talk it through</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <section class="work" aria-label="Current step">
+    <div class="wscroll" id="wscroll"><div class="gut"><div class="wbody" id="wbody"></div></div></div>
+    <div class="bar"><div class="gut"><div class="barin"><span class="barhint" id="barhint"></span><div class="barbtns" id="barbtns"></div></div></div></div>
+  </section>
+  <section class="chat" aria-label="Talk it through">
+    <div class="gut chathead"><b>Talk it through</b><span>Think out loud about this step. Wayfinder listens and asks questions.</span></div>
+    <div class="chatlog" id="chatlog"><div class="gut"><div id="log" aria-live="polite"></div></div></div>
+    <div class="gut">
+      <div class="comp">
+        <textarea id="box" rows="1" placeholder="Type here…" aria-label="Your message"></textarea>
+        <button id="sendBtn" type="button" disabled>Send</button>
+      </div>
+      <div class="unavail" id="unavail" hidden>Chat isn't switched on for this site. You can still work through every step.</div>
+      <div class="fine">Not therapy · In crisis call Lifeline 13 11 14</div>
+    </div>
+  </section>
+</div>
+
+<div class="veil" id="crisis" hidden role="dialog" aria-modal="true" aria-labelledby="crisisTitle">
+  <div class="dlg">
+    <h2 id="crisisTitle">You're not alone</h2>
+    <p>It sounds like things may be really hard right now. Please reach out to someone who can help.</p>
+    <div class="res" id="resList"></div>
+    <button class="ghost" id="crisisClose" type="button">I'm safe, continue</button>
+  </div>
+</div>
+
+<div class="veil" id="consent" hidden role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+  <div class="dlg">
+    <span class="eyebrow">Purposefields</span>
+    <h2 id="consentTitle">Before you start</h2>
+    <p>Tick each one to continue.</p>
+    <label class="check"><input type="checkbox" id="c1"><div><b>This isn't therapy</b><span>Wayfinder helps you think about your direction. It doesn't replace a counsellor, doctor or other professional.</span></div></label>
+    <label class="check"><input type="checkbox" id="c2"><div><b>The chat is AI</b><span>Replies and suggestions come from Claude, an AI made by Anthropic. Trust your own judgement.</span></div></label>
+    <label class="check"><input type="checkbox" id="c3"><div><b>Your answers are saved in this browser</b><span>They're kept on this device until you press Start over. When you use the chat or ask for suggestions, what you've written is sent to Claude so it can reply. It isn't stored on our server.</span></div></label>
+    <label class="check"><input type="checkbox" id="c4"><div><b>I'm 18 or older</b><span>Wayfinder is made for adults.</span></div></label>
+    <div class="dlgfoot">
+      <button class="ghost" id="consentHelp" type="button">Need support now?</button>
+      <button class="primary" id="consentGo" type="button" disabled>Begin</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

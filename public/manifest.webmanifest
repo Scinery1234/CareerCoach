@@ -1,0 +1,9 @@
+{
+  "name": "Purposefields Wayfinder",
+  "short_name": "Wayfinder",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef4f6",
+  "theme_color": "#23677f",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
