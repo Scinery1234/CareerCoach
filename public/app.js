@@ -27,7 +27,7 @@ const INTROS={
 };
 const CRISIS_KEYWORDS=["suicide","suicidal","kill myself","end my life","take my life","want to die","don't want to live","dont want to live","no reason to live","better off dead","end it all","can't go on","cant go on","not worth living","self-harm","self harm","hurt myself","cut myself","cutting myself","overdose","starve myself","harm myself"];
 const RESOURCES=[{name:"Lifeline",number:"13 11 14",desc:"24/7 crisis support"},{name:"Beyond Blue",number:"1300 22 4636",desc:"Mental health support"},{name:"Emergency",number:"000",desc:"Immediate danger"},{name:"SANE Australia",number:"1800 18 7263",desc:"Mental illness support"},{name:"13YARN",number:"13 92 76",desc:"Aboriginal & Torres Strait Islander"}];
-const STORE_KEY="purposefields_wayfinder_v3", GOAL_KEY="purposefields_goals", CONSENT_KEY="purposefields_consent_v1";
+const STORE_KEY="purposefields_compass_v1", GOAL_KEY="purposefields_goals", CONSENT_KEY="purposefields_consent_v1";
 const TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"Australia/Sydney"}catch{return "Australia/Sydney"}})();
 
 /* ================= server API ================= */
@@ -130,7 +130,7 @@ function finish(i){
 function saveGoals(){
   let goals=[];try{goals=JSON.parse(store.get(GOAL_KEY)||"[]");}catch{}
   const date=new Date().toLocaleDateString("en-AU");
-  S.actions.forEach((a,i)=>{if(a&&!goals.some(g=>g.text===a))goals.push({text:a,source:"Wayfinder",date,scheduled:S.sched?.[i]?.date||null});});
+  S.actions.forEach((a,i)=>{if(a&&!goals.some(g=>g.text===a))goals.push({text:a,source:"The Compass",date,scheduled:S.sched?.[i]?.date||null});});
   store.set(GOAL_KEY,JSON.stringify(goals));
 }
 
@@ -368,27 +368,27 @@ function stepCalendar(w,i){
 }
 
 /* ================= summary ================= */
-function evt(j){const s=S.sched[j],a=S.actions[j];return{title:`Wayfinder: ${a}`,details:`Toward: ${S.choose.first}\nMy North Star: ${S.north}`.slice(0,1500),date:s.date,start:s.start,end:addMin(s.start,s.dur)};}
+function evt(j){const s=S.sched[j],a=S.actions[j];return{title:`Compass: ${a}`,details:`Toward: ${S.choose.first}\nMy North Star: ${S.north}`.slice(0,1500),date:s.date,start:s.start,end:addMin(s.start,s.dur)};}
 function gcal(e){const d=e.date.replace(/-/g,"");return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.title)}&dates=${d}T${e.start.replace(":","")}00/${d}T${e.end.replace(":","")}00&ctz=${encodeURIComponent(TZ)}&details=${encodeURIComponent(e.details)}`;}
 function ics(list){
   const x=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
   const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
-  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Purposefields//Wayfinder//EN","CALSCALE:GREGORIAN"];
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Purposefields//Compass//EN","CALSCALE:GREGORIAN"];
   list.forEach((e,k)=>{const d=e.date.replace(/-/g,"");L.push("BEGIN:VEVENT",`UID:${Date.now()}-${k}@purposefields`,`DTSTAMP:${stamp}`,`DTSTART;TZID=${TZ}:${d}T${e.start.replace(":","")}00`,`DTEND;TZID=${TZ}:${d}T${e.end.replace(":","")}00`,`SUMMARY:${x(e.title)}`,`DESCRIPTION:${x(e.details)}`,"BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:-PT15M",`DESCRIPTION:${x(e.title)}`,"END:VALARM","END:VEVENT");});
   L.push("END:VCALENDAR");return L.join("\r\n");
 }
 async function copyText(t,btn){const old=btn.textContent;try{await navigator.clipboard.writeText(t);btn.textContent="Copied";}catch{btn.textContent="Couldn't copy";}setTimeout(()=>{btn.textContent=old;},1600);}
 function saveFile(name,data,btn){const old=btn.textContent;try{download(name,data);btn.textContent="Saved";}catch{btn.textContent="Couldn't save";}setTimeout(()=>{btn.textContent=old;},1600);}
 function summaryText(){
-  const L=[`MY WAYFINDER MAP`,``,`Values (in order): ${S.values.ranked.join(", ")}`,``,`I am (in order):`,...S.identity.items.map((x,k)=>`${k+1}. ${x.text}`),``,`My North Star:`,S.north,``,`What I need from work: at least ${fmtMoney(S.needs.pay)} a year, up to ${S.needs.hours} hours a week, ${S.needs.stress.toLowerCase()} stress, ${S.needs.mode.toLowerCase()}${S.needs.location?`, ${S.needs.location}`:""}${S.needs.other?`. ${S.needs.other}`:""}`,``,`I know: ${S.strengths.know.join(", ")}`,`I can do: ${S.strengths.do.join(", ")}`,`I love: ${S.strengths.love.join(", ")}`,...(S.strengths.other.length?[`I also bring: ${S.strengths.other.join(", ")}`]:[]),``,`My ideas: ${S.mix.ideas.map(d=>d.title).join(", ")}`,``,`Top pick: ${S.choose.first}${S.choose.second?`\nSecond: ${S.choose.second}`:""}`,``,`Plan`,`Now: ${S.plan.now}`,`Building: ${S.plan.building}`,`Making the move: ${S.plan.move}`,`Longer term: ${S.plan.longer}`,``,`First steps`,...S.actions.map((a,k)=>`${k+1}. ${a} — ${fmtDay(S.sched[k].date)}, ${S.sched[k].start}`)];
+  const L=[`MY COMPASS MAP`,``,`Values (in order): ${S.values.ranked.join(", ")}`,``,`I am (in order):`,...S.identity.items.map((x,k)=>`${k+1}. ${x.text}`),``,`My North Star:`,S.north,``,`What I need from work: at least ${fmtMoney(S.needs.pay)} a year, up to ${S.needs.hours} hours a week, ${S.needs.stress.toLowerCase()} stress, ${S.needs.mode.toLowerCase()}${S.needs.location?`, ${S.needs.location}`:""}${S.needs.other?`. ${S.needs.other}`:""}`,``,`I know: ${S.strengths.know.join(", ")}`,`I can do: ${S.strengths.do.join(", ")}`,`I love: ${S.strengths.love.join(", ")}`,...(S.strengths.other.length?[`I also bring: ${S.strengths.other.join(", ")}`]:[]),``,`My ideas: ${S.mix.ideas.map(d=>d.title).join(", ")}`,``,`Top pick: ${S.choose.first}${S.choose.second?`\nSecond: ${S.choose.second}`:""}`,``,`Plan`,`Now: ${S.plan.now}`,`Building: ${S.plan.building}`,`Making the move: ${S.plan.move}`,`Longer term: ${S.plan.longer}`,``,`First steps`,...S.actions.map((a,k)=>`${k+1}. ${a} — ${fmtDay(S.sched[k].date)}, ${S.sched[k].start}`)];
   return L.join("\n");
 }
 function renderSummary(w){
-  w.append(h("span",{class:"kicker",text:"Done"}),h("h2",{text:"Your Wayfinder map"}),h("p",{class:"lead",text:"Everything you worked out, in one place. Your first steps are ready to add to your calendar."}));
+  w.append(h("span",{class:"kicker",text:"Done"}),h("h2",{text:"Your Compass map"}),h("p",{class:"lead",text:"Everything you worked out, in one place. Your first steps are ready to add to your calendar."}));
   const sec=(t,...kids)=>h("div",{class:"sum"},h("h3",{text:t}),...kids);
   const evts=S.actions.map((_,j)=>evt(j));
-  w.append(sec("First steps",...S.actions.map((a,j)=>{const e=evts[j];return h("div",{class:"card"},h("b",{text:a}),h("span",{class:"when",text:`${fmtDay(e.date)} · ${e.start}–${e.end}`}),h("div",{class:"acts"},h("a",{href:gcal(e),target:"_blank",rel:"noopener noreferrer"},"Add to Google Calendar"),h("button",{type:"button",onclick:ev=>saveFile(`wayfinder-step-${j+1}.ics`,ics([e]),ev.currentTarget)},"Download for other calendars")));}),
-    h("div",{class:"acts"},h("button",{type:"button",onclick:ev=>saveFile("wayfinder-first-steps.ics",ics(evts),ev.currentTarget)},"Download all three"))));
+  w.append(sec("First steps",...S.actions.map((a,j)=>{const e=evts[j];return h("div",{class:"card"},h("b",{text:a}),h("span",{class:"when",text:`${fmtDay(e.date)} · ${e.start}–${e.end}`}),h("div",{class:"acts"},h("a",{href:gcal(e),target:"_blank",rel:"noopener noreferrer"},"Add to Google Calendar"),h("button",{type:"button",onclick:ev=>saveFile(`compass-step-${j+1}.ics`,ics([e]),ev.currentTarget)},"Download for other calendars")));}),
+    h("div",{class:"acts"},h("button",{type:"button",onclick:ev=>saveFile("compass-first-steps.ics",ics(evts),ev.currentTarget)},"Download all three"))));
   w.append(sec("Top pick",h("p",{style:"font-size:20px;font-weight:600",text:S.choose.first}),S.choose.second?h("p",{class:"hint",text:`Second: ${S.choose.second}`}):null));
   w.append(sec("North Star",h("p",{class:"ns",text:S.north})));
   w.append(sec("Values",h("p",{text:S.values.ranked.map((v,k)=>`${k+1}. ${v}`).join("   ")})));

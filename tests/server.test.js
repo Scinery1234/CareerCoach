@@ -72,7 +72,7 @@ const post = (path, body) =>
 test("serves the app shell and vendor script", async () => {
   const page = await fetch(base + "/");
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Wayfinder/);
+  assert.match(await page.text(), /The Compass/);
   assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
   const sortable = await fetch(base + "/vendor/Sortable.min.js");
   assert.equal(sortable.status, 200);
@@ -95,7 +95,7 @@ test("chat streams NDJSON and sends the guide as the system prompt", async () =>
   assert.ok(lines.length > 2, "expected incremental text lines");
 
   const { body, headers } = calls[0];
-  assert.match(body.system, /You are Wayfinder/);
+  assert.match(body.system, /You are the Compass/);
   assert.equal(body.stream, true);
   assert.equal(body.messages[0].role, "user", "first message must be a user turn");
   assert.equal(body.messages.at(-1).content, "I like calm.\n\n[Where they are] Step 1");

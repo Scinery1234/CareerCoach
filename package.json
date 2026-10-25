@@ -1,7 +1,7 @@
 {
-  "name": "purposefields-wayfinder",
+  "name": "purposefields-compass",
   "version": "1.0.0",
-  "description": "Purposefields Wayfinder: a guided career-direction tool with an AI thinking partner.",
+  "description": "The Compass by Purposefields: a guided career-direction tool with an AI thinking partner.",
   "type": "module",
   "main": "server.js",
   "scripts": {
