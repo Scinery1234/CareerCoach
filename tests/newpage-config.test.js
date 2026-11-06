@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 test('long jobs (resume, cover letter, Sky) are allowed to run for a minute, not the default 10 seconds', () => {
   const v = JSON.parse(readFileSync('vercel.json', 'utf8'))
-  assert.ok(v.functions['api/app.js'].maxDuration >= 60)
+  assert.ok(v.functions['api/newpage/app.js'].maxDuration >= 60)
   assert.ok(v.functions['api/newpage/docx.py'].maxDuration >= 30)
   assert.ok(v.functions['api/newpage/resume.py'].maxDuration >= 300)
   assert.match(v.functions['api/newpage/docx.py'].includeFiles, /api\/_py/)
