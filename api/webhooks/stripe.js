@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase.js'
 import { sendConfirmation } from '../../lib/resend.js'
 import { createOutlookEvent } from '../../lib/outlook.js'
 import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
-import { applyCheckout, applyInvoicePaid, applySubscriptionEnded, applySubscriptionUpdated } from '../../lib/newpage-payments.js'
+import { applyCheckout, applyInvoicePaid, applySubscriptionEnded, applySubscriptionUpdated, applyTrialWillEnd } from '../../lib/newpage-payments.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -43,9 +43,10 @@ export default async function handler(req, res) {
   }
 
   // The $25-a-month tools membership: later months, cancellations.
-  if (event.type === 'invoice.paid' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.updated') {
+  if (event.type === 'invoice.paid' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.trial_will_end') {
     try {
       if (event.type === 'invoice.paid') await applyInvoicePaid(event.data.object)
+      else if (event.type === 'customer.subscription.trial_will_end') await applyTrialWillEnd(event.data.object)
       else if (event.type === 'customer.subscription.deleted') await applySubscriptionEnded(event.data.object)
       else await applySubscriptionUpdated(event.data.object)
     } catch (err) {

@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase.js'
 import { rateLimit, isBot } from '../../lib/security.js'
-import { PRICE } from '../../lib/newpage-pricing.js'
+import { PRICE, TRIAL_DAYS } from '../../lib/newpage-pricing.js'
 import { stripe, toolsSessionParams } from '../../lib/newpage-stripe.js'
 import { applyCheckout } from '../../lib/newpage-payments.js'
 import { signSession } from '../../lib/newpage-auth.js'
@@ -27,7 +27,8 @@ export default async function handler(req, res) {
     if (!/^cs_(test_|live_)?[A-Za-z0-9]{10,200}$/.test(sid)) return res.status(400).json({ error: 'That payment link doesn’t look right.' })
     try {
       const session = await stripe().checkout.sessions.retrieve(sid)
-      if (session.metadata?.kind !== 'newpage_tools' || session.payment_status !== 'paid') return res.status(402).json({ error: 'We haven’t seen that payment come through yet. Give it a minute and refresh this page.', code: 'not_paid' })
+      const started = session.payment_status === 'paid' || (session.payment_status === 'no_payment_required' && Number(session.metadata?.trial) > 0)
+      if (session.metadata?.kind !== 'newpage_tools' || !started) return res.status(402).json({ error: 'We haven’t seen that payment come through yet. Give it a minute and refresh this page.', code: 'not_paid' })
       await applyCheckout(session)
       const email = (session.metadata.email || session.customer_email || '').toLowerCase()
       const { data: member } = await supabase.from('newpage_members').select('id, status, last_login_at, created_at').eq('email', email).maybeSingle()
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
   }
 
   // One plan: the monthly membership. Sessions with a human coach are bought inside the app.
-  if (b.action === 'quote') return res.json({ plan: 'tools', totalCents: PRICE.toolsCents, monthly: true })
+  if (b.action === 'quote') return res.json({ plan: 'tools', totalCents: PRICE.toolsCents, monthly: true, trialDays: TRIAL_DAYS() })
   if (b.action !== 'start') return res.status(400).json({ error: 'Unknown action' })
 
   const email = clip(b.email, 200).toLowerCase()

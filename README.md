@@ -24,7 +24,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 
 1. **Vercel.** New project from this repo, production branch set to this branch. Root is the repo. Python functions need the Python runtime (Vercel picks it up from the `.py` files).
 2. **Supabase.** New project. Run `sql/schema.sql`, then `sql/newpage.sql`, in the SQL editor.
-3. **Stripe.** A webhook to `https://aicareercoach.net/api/webhooks/stripe` for `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`. Turn on the Customer Portal (Settings, Billing, Customer portal).
+3. **Stripe.** A webhook to `https://aicareercoach.net/api/webhooks/stripe` for `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end`. Turn on the Customer Portal (Settings, Billing, Customer portal).
 4. **Resend.** Verify `aicareercoach.net` and set `FROM_EMAIL` on it.
 5. **Environment variables** (Vercel, Production):
 
@@ -36,6 +36,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` | Admin sign-in. Hash with `npm run generate-hash -- 'your password'` |
 | `ANTHROPIC_API_KEY` | Sky and the writers |
 | `NEWPAGE_WRITER_MODEL`, `RESUME_MODEL` | Optional. `claude-sonnet-5-5` keeps the writers cheap; default is Opus |
+| `TRIAL_DAYS` | Free trial on the membership, card taken at checkout. Default 7; 0 switches it off and the pages say $25 a month |
 | `NEWPAGE_MEMORY_KEY` | 32 random bytes, base64. Encrypts Sky's memory. `openssl rand -base64 32` |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | From Stripe |
 | `RESEND_API_KEY`, `FROM_EMAIL`, `FROM_NAME` | Email |
@@ -43,6 +44,12 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `GOOGLE_*` | Optional: the human coach's Google Calendar, for busy times and invites (see `lib/google-calendar.js`) |
 
 6. In the admin, press **Is everything working?** It checks every table, column, key and service and names what's missing.
+
+## The landing page and ads
+
+`index.html` is the page ads land on. It carries one message, one button and the product drawn in HTML, with proof next to the button and the objections answered under it. Each ad angle has its own headline: send traffic to `/?v=resume` (default), `/?v=direction`, `/?v=stuck` or `/?v=interview`, so the ad's promise and the headline match. The variant travels to the thank-you page and is sent with the conversion event.
+
+Conversion tracking: put your ids in `track.js` (`ga4`, `meta`, or a Google Ads `gadsLabel`). It fires `begin_checkout`/`InitiateCheckout` on the start buttons and `purchase`/`StartTrial` on the join thank-you page. With the ids empty nothing loads.
 
 ## Prices
 

@@ -22,19 +22,22 @@ function render() {
   $('j-submit').disabled = S.busy
 }
 
-// The $25-a-month plan: no extra hours, no scholarship codes, renews monthly.
+// The membership: a free trial when the server offers one, then $25 a month. Renews monthly.
+let TRIAL = null
 function renderTools() {
-  document.querySelector('#form-screen .note').textContent = 'join'
-  document.querySelector('#form-screen h1').replaceChildren('Start ', Object.assign(document.createElement('span'), { className: 'hl', textContent: 'AI Career Coach' }))
-  document.querySelector('#form-screen .lead').textContent = 'Sky the AI Coach, the Compass, the resume and cover letter writers, your planner and notes. $25 a month, cancel any time.'
+  if (TRIAL === null) { TRIAL = 0; post({ action: 'quote' }).then(q => { TRIAL = q.trialDays || 0; render() }).catch(() => {}) }
+  const t = TRIAL || 0
+  document.querySelector('#form-screen .note').textContent = t ? 'free trial' : 'join'
+  document.querySelector('#form-screen h1').replaceChildren(t ? 'Start your ' : 'Start ', Object.assign(document.createElement('span'), { className: 'hl', textContent: t ? (t === 7 ? 'free week' : `${t} free days`) : 'AI Career Coach' }))
+  document.querySelector('#form-screen .lead').textContent = t ? `Sky the AI Coach, resume tailoring, the cover letter writer, the Compass, your planner and notes. Free for ${t === 7 ? 'a week' : t + ' days'}, then $25 a month. Cancel in two taps, any time.` : 'Sky the AI Coach, the Compass, the resume and cover letter writers, your planner and notes. $25 a month, cancel any time.'
   $('hours-field').hidden = true; $('j-code').closest('.field').hidden = true
   const box = $('summary'); box.replaceChildren()
   const row = (l, r, cls) => { const d = document.createElement('div'); d.className = 'sum ' + (cls || ''); const a = document.createElement('span'), b = document.createElement('span'); a.textContent = l; b.textContent = r; d.append(a, b); box.append(d) }
-  row('AI Career Coach membership, monthly', '$25 / month')
-  row('Today', '$25', 'total')
-  text($('j-submit'), S.busy ? 'One moment…' : 'Pay $25 and start')
+  if (t) { row(`First ${t} days`, 'free'); row('Then, each month', '$25'); row('Today', '$0', 'total') }
+  else { row('AI Career Coach membership, monthly', '$25 / month'); row('Today', '$25', 'total') }
+  text($('j-submit'), S.busy ? 'One moment…' : t ? 'Start my free ' + (t === 7 ? 'week' : 'trial') : 'Pay $25 and start')
   $('j-submit').disabled = S.busy
-  text($('j-fine'), 'Pay by card on the next page. Renews each month at $25 until you cancel, which you can do any time from the app. You keep access to the end of the month you’ve paid for. Each month includes 300 messages to Sky, 3 resumes, 150 tailored resumes and 100 cover letters. Coaching, not therapy. For people 18 and over.')
+  text($('j-fine'), (t ? `Card details on the next page, nothing charged today. We email you three days before the trial ends. After it, $25 a month until you cancel, which you can do any time from the app. ` : 'Pay by card on the next page. Renews each month at $25 until you cancel, which you can do any time from the app. You keep access to the end of the month you’ve paid for. ') + 'Each month includes 300 messages to Sky, 3 resumes, 150 tailored resumes and 100 cover letters. Coaching, not therapy. For people 18 and over.')
 }
 
 async function post(body) {
@@ -83,9 +86,9 @@ function showDone({ scholarship = false, email = '', session = null, checking = 
   $('form-screen').hidden = true; $('cancel-screen').hidden = true; $('done-screen').hidden = false
   const signedIn = session ? signIn(session) : false
   text($('done-title'), checking ? 'Thanks. One moment…' : plan === 'tools' ? 'You’re in. Welcome to AI Career Coach.' : 'You’re in. Welcome to AI Career Coach.')
-  text($('done-text'), problem || (checking ? 'We’re confirming your payment.'
+  text($('done-text'), problem || (checking ? 'We’re confirming your details.'
     : scholarship ? 'Your scholarship is confirmed, and you’re signed in.'
-      : 'Your payment went through' + (signedIn ? ', and you’re signed in.' : '.')))
+      : (TRIAL ? 'Your free trial has started' : 'Your payment went through') + (signedIn ? ', and you’re signed in.' : '.')))
   const next = $('done-next'); next.replaceChildren()
   if (!checking && !problem) {
     const steps = plan === 'tools' ? [

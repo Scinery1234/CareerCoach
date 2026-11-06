@@ -50,3 +50,29 @@ test('the app payload marks the plan, lets members buy sessions, and the welcome
   assert.ok(mail.html.includes('300 messages') && mail.html.includes('3 resumes') && mail.html.includes('100 cover letters') && mail.html.includes('150 resumes tailored') && /human career coach/.test(mail.html))
   assert.ok(!/Vik/.test(mail.html), 'the tools welcome email does not name Vik')
 })
+
+test('the membership starts with a card-required free trial, which can be switched off', async () => {
+  const { toolsSessionParams } = await import('../lib/newpage-stripe.js')
+  const { TRIAL_DAYS } = await import('../lib/newpage-pricing.js')
+  const { trialEndingEmail } = await import('../lib/newpage-emails.js')
+  delete process.env.TRIAL_DAYS
+  assert.equal(TRIAL_DAYS(), 7)
+  const p = toolsSessionParams({ email: 'a@b.co', name: 'Ana' })
+  assert.equal(p.subscription_data.trial_period_days, 7)
+  assert.equal(p.payment_method_collection, 'always', 'the card is taken at checkout')
+  assert.equal(p.metadata.trial, '7')
+  assert.equal(p.line_items[0].price_data.unit_amount, 2500)
+  process.env.TRIAL_DAYS = '0'
+  const q = toolsSessionParams({ email: 'a@b.co', name: 'Ana' })
+  assert.equal(q.subscription_data.trial_period_days, undefined)
+  assert.equal(q.payment_method_collection, undefined)
+  process.env.TRIAL_DAYS = '99'
+  assert.equal(TRIAL_DAYS(), 7, 'a silly value falls back to 7')
+  delete process.env.TRIAL_DAYS
+  const w = toolsWelcomeEmail({ name: 'Ana Reyes', link: 'https://x/app?t=1', trialDays: 7 })
+  assert.ok(/free week/.test(w.html) && /nothing is charged until it ends/.test(w.html) && /\$25 a month/.test(w.html))
+  assert.ok(!/free week/.test(toolsWelcomeEmail({ name: 'Ana Reyes', link: 'https://x/app?t=1' }).html))
+  const e = trialEndingEmail({ name: 'Ana Reyes', ends: new Date('2027-02-10T00:00:00Z') })
+  assert.match(e.subject, /Your free week ends/)
+  assert.ok(/\$25 a month/.test(e.html) && /Change card or cancel/.test(e.html) && /Hi Ana/.test(e.html))
+})
