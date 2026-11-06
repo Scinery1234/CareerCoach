@@ -6,7 +6,7 @@ The steps are: Values → Who I am → North Star → What I need → Strengths 
 
 ## Run it
 
-Requires Node.js 20+.
+Requires Node.js 22.9 or newer (`npm run dev` uses `--env-file-if-exists`).
 
 ```bash
 npm install
@@ -39,4 +39,4 @@ Notes:
 - **Answers are stored in the browser** (`localStorage`) until the person presses Start over. The server doesn't store anything. It passes what the person wrote to Claude when they chat or ask for a suggestion, and the consent screen says so.
 - **Safety.** Crisis keywords open the support dialog (Australian services) on the client. The guide prompt also tells Claude to step out of the career conversation and share the same services.
 - **Models.** The default is `claude-opus-5-5` (effort `low` for chat, `medium` for suggestions) and `claude-haiku-5-5` for the quick single-mix idea. Change them with `COMPASS_MODEL` / `COMPASS_QUICK_MODEL`. Server-side refusal fallback (`fallbacks: "default"`) is on for non-Haiku models; turn it off with `COMPASS_FALLBACKS=off`.
-- **Rate limit.** 20 AI requests per IP per minute by default (`RATE_LIMIT_PER_MIN`). The limit is kept in memory, so it covers a single instance only. Set `TRUST_PROXY` when you run behind a reverse proxy.
+- **Rate limit.** 40 AI requests per IP per minute by default (`RATE_LIMIT_PER_MIN`), with a separate bucket of 60 for the cheap per-mix idea button (`QUICK_RATE_LIMIT_PER_MIN`). The limit is kept in memory, so it covers a single instance only. Set `TRUST_PROXY` when you run behind a reverse proxy.

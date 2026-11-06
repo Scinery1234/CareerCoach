@@ -142,10 +142,74 @@ test("ideas, plan and steps return cleaned results", async () => {
   next = (body, res) => json(res, JSON.stringify({ now: "Start", building: "Build", move: "Move", longer: "Later" }));
   assert.deepEqual(await (await post("/api/suggest/plan", { data: profile })).json(), { now: "Start", building: "Build", move: "Move", longer: "Later" });
 
-  next = (body, res) => json(res, JSON.stringify({ steps: ["Call Sam", "Write a list", "Visit a nursery", "Extra"] }));
+  next = (body, res) => json(res, JSON.stringify({ step1: " Call Sam", step2: "Write a list", step3: "Visit a nursery " }));
   assert.deepEqual(await (await post("/api/suggest/steps", { data: { ...profile, planNow: "Start" } })).json(), {
     steps: ["Call Sam", "Write a list", "Visit a nursery"],
   });
+  assert.deepEqual(Object.keys(calls.at(-1).body.output_config.format.schema.properties), ["step1", "step2", "step3"]);
+});
+
+test("ideas get the needs as a fit filter, without pay, and repeats are dropped", async () => {
+  calls.length = 0;
+  const profile = {
+    values: ["Family"], iAm: ["I am a dad"], north: "School pick-up at three", ideas: ["Solar trainer"],
+    needs: { pay: "90000", hours: "38", stress: "Low", mode: "On-site", location: "Gold Coast", other: "School pick-up on Wednesdays" },
+    strengths: { know: ["Solar"], do: ["Teach"], love: ["Kids"] },
+  };
+  next = (body, res) => json(res, JSON.stringify({ ideas: [
+    { title: "solar trainer", know: "Solar", do: "Teach", love: "Kids", why: "x" },
+    { title: "School electrician", know: "Solar", do: "Teach", love: "Kids", why: "y" },
+    { title: "school electrician", know: "Solar", do: "Teach", love: "Kids", why: "z" },
+  ] }));
+  const out = await (await post("/api/suggest/ideas", { data: profile })).json();
+  assert.deepEqual(out.ideas.map(i => i.title), ["School electrician"]);
+  const prompt = calls[0].body.messages[0].content;
+  assert.match(prompt, /Things the work has to fit: up to 38 hours a week, low stress, on-site, Gold Coast. Also: School pick-up on Wednesdays/);
+  assert.doesNotMatch(prompt, /90000/);
+});
+
+test("suggestions are checked and capped before anything reaches Claude", async () => {
+  calls.length = 0;
+  next = (body, res) => json(res, JSON.stringify({ now: "a", building: "b", move: "c", longer: "d" }));
+  // Not enough to work with: no strengths for ideas, no top pick for plan, no plan for steps.
+  assert.equal((await post("/api/suggest/ideas", { data: { strengths: { know: ["a"] } } })).status, 400);
+  assert.equal((await post("/api/suggest/plan", { data: {} })).status, 400);
+  assert.equal((await post("/api/suggest/steps", { data: { first: "Gardener" } })).status, 400);
+  assert.equal((await post("/api/suggest/mixIdea", { data: { know: "a", do: "b" } })).status, 400);
+  assert.equal(calls.length, 0, "nothing was sent upstream");
+
+  // Oversized and junk fields are capped and dropped; blank profile lines are left out.
+  const res = await post("/api/suggest/plan", { data: { first: "Gardener", north: "x".repeat(5000), values: [1, { a: 1 }, "Calm"], strengths: { know: Array.from({ length: 50 }, (_, i) => "k" + i) } } });
+  assert.equal(res.status, 200);
+  const prompt = calls[0].body.messages[0].content;
+  assert.ok(prompt.length < 4000, "north star was capped");
+  assert.doesNotMatch(prompt, /object Object/);
+  assert.doesNotMatch(prompt, /k49/);
+  assert.doesNotMatch(prompt, /\$ a year/);
+  assert.doesNotMatch(prompt, /Second choice/);
+});
+
+test("an empty or repeated answer is asked for once more, then reported", async () => {
+  calls.length = 0;
+  let n = 0;
+  next = (body, res) => json(res, JSON.stringify({ idea: n++ ? "Garden educator" : "Florist" }));
+  const res = await post("/api/suggest/mixIdea", { data: { know: "a", do: "b", love: "c", avoid: ["florist"] } });
+  assert.deepEqual(await res.json(), { idea: "Garden educator" });
+  assert.equal(calls.length, 2);
+
+  calls.length = 0;
+  next = (body, res) => json(res, JSON.stringify({ step1: "Only one", step2: "", step3: "" }));
+  const short = await post("/api/suggest/steps", { data: { first: "Gardener", planNow: "Start" } });
+  assert.equal(short.status, 502);
+  assert.deepEqual(await short.json(), { error: "empty_completion" });
+  assert.equal(calls.length, 2);
+});
+
+test("a reply cut off at max_tokens has its own code", async () => {
+  next = (body, res) => json(res, "{\"now\": \"Sta", "max_tokens");
+  const res = await post("/api/suggest/plan", { data: { first: "Gardener" } });
+  assert.equal(res.status, 502);
+  assert.deepEqual(await res.json(), { error: "cut_off" });
 });
 
 test("suggest maps errors and unknown tasks", async () => {
@@ -153,10 +217,10 @@ test("suggest maps errors and unknown tasks", async () => {
   assert.equal((await post("/api/suggest/plan", {})).status, 400);
 
   next = (body, res) => json(res, "", "end_turn", 429);
-  const limited = await post("/api/suggest/plan", { data: {} });
+  const limited = await post("/api/suggest/plan", { data: { first: "Gardener" } });
   assert.equal(limited.status, 429);
   assert.deepEqual(await limited.json(), { error: "rate_limited" });
 
   next = (body, res) => json(res, "", "refusal");
-  assert.deepEqual(await (await post("/api/suggest/plan", { data: {} })).json(), { error: "refused" });
+  assert.deepEqual(await (await post("/api/suggest/plan", { data: { first: "Gardener" } })).json(), { error: "refused" });
 });

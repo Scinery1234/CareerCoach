@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { streamChat, runTask, errorCode } from "./lib/claude.js";
+import { streamChat, runTask, prepareTask, errorCode } from "./lib/claude.js";
 import { TASKS } from "./lib/prompts.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +18,7 @@ const STATUS = {
   overloaded: 503,
   refused: 422,
   empty_completion: 502,
+  cut_off: 502,
   connection: 502,
   error: 500,
 };
@@ -108,7 +109,10 @@ export function createApp() {
   app.get("/healthz", (req, res) => res.json({ ok: true }));
   app.get("/api/status", (req, res) => res.json({ ai: aiConfigured() }));
 
-  const limit = rateLimiter(Number(process.env.RATE_LIMIT_PER_MIN) || 20);
+  // Chat and the bigger suggestions share one bucket; the cheap per-mix idea
+  // button gets its own, since the Mix step shows ten of them.
+  const limit = rateLimiter(Number(process.env.RATE_LIMIT_PER_MIN) || 40);
+  const quickLimit = rateLimiter(Number(process.env.QUICK_RATE_LIMIT_PER_MIN) || 60);
   const api = express.Router();
   api.use(express.json({ limit: "256kb" }));
 
@@ -147,11 +151,13 @@ export function createApp() {
     res.end();
   });
 
-  api.post("/suggest/:kind", requireAi, limit, async (req, res) => {
+  const pickLimit = (req, res, next) => (TASKS[req.params.kind]?.quick ? quickLimit : limit)(req, res, next);
+  api.post("/suggest/:kind", requireAi, pickLimit, async (req, res) => {
     const { kind } = req.params;
     if (!Object.hasOwn(TASKS, kind)) return res.status(404).json({ error: "bad_request" });
-    const data = req.body?.data;
-    if (!data || typeof data !== "object") return res.status(400).json({ error: "bad_request" });
+    // Clean, cap and check the profile before anything is sent to Claude.
+    const data = prepareTask(kind, req.body?.data);
+    if (!data) return res.status(400).json({ error: "bad_request" });
     try {
       res.json(await runTask(kind, data, { signal: abortOnClose(req, res) }));
     } catch (e) {
