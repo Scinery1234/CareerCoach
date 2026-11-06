@@ -45,7 +45,7 @@ export function openSky(ctx) {
         h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { close(); ctx.go('tools', 'context') } }, 'Set up Sky')),
       h('ul', { class: 'sky-facts' },
         h('li', {}, 'Sky is an AI. It is not your coach, and it can’t replace your 60-minute session with him.'),
-        h('li', {}, 'It’s coaching, not therapy. If things get heavy, Lifeline is on 13 11 14, any time.'),
+        h('li', {}, 'It’s coaching, not therapy. If things get heavy, a helpline near you is at findahelpline.com, any time.'),
         h('li', {}, 'Sky keeps notes as you chat, without asking. You can see, edit and delete them in Your context, and you choose what your coach can see.')),
       h('ul', { class: 'focus-list' }, coaches.map(focusCard))))
   back = back || document.body

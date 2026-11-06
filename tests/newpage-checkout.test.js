@@ -51,7 +51,7 @@ test('the welcome email has a one-click sign-in link and explains the first step
   const { memberWelcomeEmail } = await import('../lib/newpage-emails.js')
   const withPlan = memberWelcomeEmail({ name: 'Sam <b>', link: 'https://example.org/app?t=abc', hasPlan: true })
   assert.ok(withPlan.html.includes('href="https://example.org/app?t=abc"'))
-  assert.ok(withPlan.html.includes('Your first 15 minutes') && withPlan.html.includes('1:1 session') && withPlan.html.includes('13 11 14') && withPlan.html.includes('full refund'))
+  assert.ok(withPlan.html.includes('Your first 15 minutes') && withPlan.html.includes('1:1 session') && withPlan.html.includes('findahelpline.com') && withPlan.html.includes('full refund'))
   assert.ok(withPlan.html.includes('plan is already there') && !withPlan.html.includes('2-minute check-in. It places'))
   assert.ok(!withPlan.html.includes('Sam <b>') && withPlan.html.includes('Sam'))
   assert.ok(memberWelcomeEmail({ name: 'Sam' }).html.includes('2-minute check-in'))

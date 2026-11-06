@@ -419,7 +419,7 @@ function coachScreen() {
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'context') }, 'Set up Sky')),
     !me.coachOn && h('p', { class: 'soft' }, 'The coach isn’t switched on yet. Everything else in AI Career Coach works.'),
     S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'),
-      h('p', {}, 'Lifeline 13 11 14 (24/7) · Beyond Blue 1300 22 4636 · Emergency 000')),
+      h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),
     h('div', { class: 'msgs', id: 'msgs' },
       me.messages.length ? me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.content))
         : h('div', { class: 'msg assistant' }, `Hi${me.member.name ? ' ' + me.member.name.split(' ')[0] : ''}. ${info.open}`),
@@ -550,7 +550,7 @@ function meScreen() {
         h('dt', {}, 'Started'), h('dd', {}, new Date(me.member.startedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }))),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: signOut }, 'Sign out')),
     h('div', { class: 'card' }, h('span', { class: 'label' }, 'Support, any time'),
-      h('p', { class: 'small' }, 'Lifeline 13 11 14 (24/7) · Beyond Blue 1300 22 4636 · 13YARN 13 92 76 · Emergency 000')))
+      h('p', { class: 'small' }, 'In crisis, call your local emergency number. Helplines near you: findahelpline.com. In Australia: Lifeline 13 11 14 (24/7), Beyond Blue 1300 22 4636, 13YARN 13 92 76.')))
 }
 
 function checkinResultCard() {
@@ -559,8 +559,8 @@ function checkinResultCard() {
     h('span', { class: 'note' }, 'saved'),
     h('p', { style: { 'font-family': 'var(--display)', 'font-weight': '700', 'font-size': '28px' } }, 'You’re in ', h('span', { class: 'hl' }, Q.name), '.'),
     h('p', { class: 'muted' }, Q.tag),
-    r.struggling && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Thanks for being honest.'), h('p', {}, 'It sounds like things are really hard right now. Your career can wait. Lifeline 13 11 14 (24/7) · Beyond Blue 1300 22 4636 · Emergency 000.')),
-    r.lowMood && !r.struggling && h('p', { class: 'small' }, 'You mentioned feeling low. Go easy on yourself, and if things get heavier, Lifeline is there on 13 11 14, any time.'),
+    r.struggling && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Thanks for being honest.'), h('p', {}, 'It sounds like things are really hard right now. Your career can wait. Call your local emergency number, or find a helpline near you at findahelpline.com (in Australia, Lifeline 13 11 14, any time).')),
+    r.lowMood && !r.struggling && h('p', { class: 'small' }, 'You mentioned feeling low. Go easy on yourself, and if things get heavier, a helpline near you is at findahelpline.com, any time.'),
     h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { S.checkinResult = null; go('today') } }, 'Back to today'))
 }
 
