@@ -99,7 +99,7 @@ test('coach prompt carries the plan, week, tasks and notes, and the safety rules
   assert.match(sys, /Update resume \(due 2026-10-12\)/); assert.ok(!/Old thing/.test(sys))
   assert.match(sys, /Wants a policy role/)
   assert.match(sys, /13 11 14/); assert.match(sys, /You are an AI/); assert.match(sys, /not therapy/)
-  assert.deepEqual(COACH_TOOLS.map(t => t.name), ['save_memory', 'add_task'])
+  assert.deepEqual(COACH_TOOLS.map(t => t.name), ['save_memory', 'log_application', 'update_application', 'set_weekly_target', 'record_apply_offer', 'add_task'])
 })
 
 test('conversation history is sent as alternating turns starting with the member', () => {

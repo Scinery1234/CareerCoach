@@ -512,7 +512,7 @@ function toolsScreen() {
       h('button', { class: 'toolcard', type: 'button', onclick: () => go('tools', id) },
         h('b', {}, name), h('span', {}, blurb), status[id] && h('small', {}, status[id]))))]),
     h('div', { class: 'card' }, h('span', { class: 'label' }, 'Need to talk something through?'),
-      h('p', { class: 'small' }, 'Sky, your AI Coach, is in the Coach tab, with nine focus areas: career, recovery, action, interview, decisions and more.'),
+      h('p', { class: 'small' }, 'Sky, your AI Coach, is in the Coach tab, with ten focus areas: career, recovery, action, applying, interview, decisions and more.'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky')))
 }
 

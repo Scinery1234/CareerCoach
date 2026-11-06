@@ -1,4 +1,4 @@
-// Small icons for Sky's nine focus areas. The markup below is fixed text, never
+// Small icons for Sky's ten focus areas. The markup below is fixed text, never
 // anything a member typed.
 const PATHS = {
   career: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
@@ -9,9 +9,10 @@ const PATHS = {
   cbt: '<path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.6A8 8 0 1 1 21 12z"/><path d="M9 11h6M9 14h4"/>',
   interview: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
   offer: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 14l2 2 4-4"/>',
-  clarity: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'
+  clarity: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  applying: '<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/><path d="M16 4v4h4"/>'
 }
-const TINT = { career: '#E3ECFB', recovery: '#E8E3FB', action: '#FFF1C9', exec: '#DDF4EA', charge: '#FBE3E8', cbt: '#DCF1FA', interview: '#FDE7D6', offer: '#E9F5D2', clarity: '#D9EEF0' }
+const TINT = { career: '#E3ECFB', recovery: '#E8E3FB', action: '#FFF1C9', exec: '#DDF4EA', charge: '#FBE3E8', cbt: '#DCF1FA', interview: '#FDE7D6', offer: '#E9F5D2', clarity: '#D9EEF0', applying: '#FBEEDC' }
 
 export function focusIcon(id, size = 36) {
   const wrap = document.createElement('span')

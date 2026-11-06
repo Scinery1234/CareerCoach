@@ -1,5 +1,5 @@
 // "Meet Sky": a panel that slides in from the right (up from the bottom on a
-// phone) explaining Sky, the AI Coach, and its nine focus areas. It is also the
+// phone) explaining Sky, the AI Coach, and its ten focus areas. It is also the
 // focus picker, so the chat itself stays uncluttered. Opens on its own the
 // first time someone visits the Coach tab.
 import { h } from './ui.js'
