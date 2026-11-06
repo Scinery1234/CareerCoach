@@ -47,7 +47,8 @@ def unseal(token, secret):
         if not hmac.compare_digest(want, sig):
             raise ValueError
         session = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
-        if time.time() - float(session.get("t", 0)) > SESSION_TTL:
+        # A session lives seven days from when it was started, however often it is used.
+        if time.time() - float(session.get("born", session.get("t", 0))) > SESSION_TTL:
             raise ValueError
         return session
     except Exception:
@@ -100,9 +101,14 @@ def _sources(s):
 def _write(s, ask, prompt):
     """One drafting or revision call, then the automatic checks and one repair."""
     out = ask(prompts.SYSTEM_PROMPT, prompt, prompts.DRAFT_RESPONSE_SCHEMA)
+    if not isinstance(out, dict):
+        out = {}
     resume = normalise(out.get("resume"))
     notes = [str(n).strip() for n in out.get("verification_notes") or [] if str(n).strip()][:10]
     status = "questions" if out.get("status") == "questions" and out.get("questions") else "draft"
+    # A draft with no name and no roles is a malformed answer, not a resume; say so rather than show "[NAME]".
+    if status == "draft" and not resume["candidate"].get("full_name") and not resume["professional_experience"] and not resume["professional_summary"]:
+        raise claude.ClaudeError("error", "The model returned an empty draft")
     questions = [str(q).strip() for q in out.get("questions") or [] if str(q).strip()][:6] if status == "questions" else []
     issues = lint.quality_issues(resume) + lint.integrity_issues(resume, _sources(s))
     if issues and status == "draft":
@@ -127,6 +133,7 @@ def _draft_messages(s, status):
 
 def _out(s, secret, messages):
     s["t"] = time.time()
+    s.setdefault("born", s["t"])
     return {"state": s["state"], "session": seal(s, secret), "messages": messages, "resume": s.get("resume")}
 
 
@@ -134,7 +141,7 @@ def _clip(v, n):
     return str(v or "").strip()[:n]
 
 
-def start(materials, secret, job_description="", target_title="", additional="", ask=None):
+def start(materials, secret, job_description="", target_title="", additional="", ask=None, owner=None):
     """Phase 1: draft the resume from the candidate's materials."""
     ask = ask or claude.ask_structured
     materials = _clip(materials, MAX_MATERIALS)
@@ -142,19 +149,19 @@ def start(materials, secret, job_description="", target_title="", additional="",
         raise AgentError("input", "Add your current resume or career notes first: upload a file or paste your roles, dates and achievements.")
     s = {"v": 1, "state": State.DRAFTING.value, "materials": materials, "job_description": _clip(job_description, MAX_JD),
          "target_title": _clip(target_title, 200), "additional": _clip(additional, 6000), "answers": "",
-         "resume": None, "notes": [], "questions": []}
+         "resume": None, "notes": [], "questions": [], "owner": owner}
     status = _write(s, ask, prompts.build_draft_prompt(s["materials"], s["job_description"], s["target_title"], s["additional"]))
     if status == "draft":
         s["state"] = advance(State.DRAFTING, "drafted").value
     return _out(s, secret, _draft_messages(s, status))
 
 
-def resume_session(resume, secret, materials="", job_description="", target_title=""):
+def resume_session(resume, secret, materials="", job_description="", target_title="", owner=None):
     """Open a saved resume (either shape) at the content approval gate, for amendments or a new Word file."""
     d = from_legacy(resume)
     s = {"v": 1, "state": State.AWAITING_CONTENT_APPROVAL.value, "materials": _clip(materials, MAX_MATERIALS) or draft_text(d),
          "job_description": _clip(job_description, MAX_JD), "target_title": _clip(target_title, 200), "additional": "",
-         "answers": "", "resume": d, "notes": [], "questions": []}
+         "answers": "", "resume": d, "notes": [], "questions": [], "owner": owner}
     return _out(s, secret, _draft_messages(s, "draft"))
 
 
@@ -210,10 +217,13 @@ def _generate(s):
     return [result]
 
 
-def reply(token, message, secret, ask=None):
+def reply(token, message, secret, ask=None, owner=None):
     """Handle one message from the candidate."""
     ask = ask or claude.ask_structured
     s = unseal(token, secret)
+    # A session belongs to the member who started it.
+    if s.get("owner") and owner and s["owner"] != owner:
+        raise AgentError("session", "This resume session belongs to another sign-in. Please start again.")
     msg = _clip(message, 6000)
     state = State(s["state"])
 

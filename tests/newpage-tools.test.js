@@ -232,3 +232,13 @@ test('an AI failure gives the member a useful message, and the log gets the real
   assert.match(aiMessage({ status: 429 }), /busy/)
   assert.match(aiMessage(new Error('x')), /try again in a minute/)
 })
+
+test('askJson does not retry a genuine 400', async () => {
+  const saved = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => { calls++; return new Response(JSON.stringify({ error: { message: 'prompt is too long' } }), { status: 400 }) }
+  try {
+    await assert.rejects(() => askJson({ system: 's', prompt: 'p', schema: {} }), /too long/)
+    assert.equal(calls, 1)
+  } finally { globalThis.fetch = saved }
+})

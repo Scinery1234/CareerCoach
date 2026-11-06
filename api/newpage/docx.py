@@ -18,7 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import doc_builder as rb  # noqa: E402  (copied unchanged from Resume-Generator)
 import cover_builder as cb  # noqa: E402
-from np_auth import verify_session  # noqa: E402,F401  (re-exported for tests)
+from np_auth import session_claims, verify_session  # noqa: E402,F401  (verify_session re-exported for tests)
+from np_usage import member_access  # noqa: E402
 from resume_agent.extract import extract_text  # noqa: E402,F401
 
 MAX_BODY = 4_000_000
@@ -46,6 +47,9 @@ class handler(BaseHTTPRequestHandler):
 
         if not verify_session(str(b.get("token") or "")):
             return respond(self, 401, {"error": "Please sign in again.", "code": "auth"})
+        ok, why = member_access(str((session_claims(str(b.get("token") or "")) or {}).get("sub")))
+        if not ok:
+            return respond(self, 403, {"error": why, "code": "expired"})
 
         action = b.get("action")
         template = b.get("template") if b.get("template") in TEMPLATE_IDS else "modern"

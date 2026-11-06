@@ -27,7 +27,7 @@ from http.server import BaseHTTPRequestHandler
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_py"))
 
 from np_auth import derived_secret, session_claims  # noqa: E402
-from np_usage import resume_allowance, resume_spend  # noqa: E402
+from np_usage import member_access, resume_allowance, resume_spend  # noqa: E402
 from resume_agent import agent  # noqa: E402
 from resume_agent.claude import ClaudeError  # noqa: E402
 from resume_agent.execute import generate_document  # noqa: E402
@@ -78,6 +78,9 @@ def handle(b):
     claims = session_claims(str(b.get("token") or ""))
     if not claims:
         return 401, {"error": "Please sign in again.", "code": "auth"}
+    ok, why = member_access(str(claims.get("sub")))
+    if not ok:
+        return 403, {"error": why, "code": "expired"}
     action = b.get("action")
 
     if action == "extract":
@@ -119,15 +122,15 @@ def handle(b):
             if not ok:
                 return 429, {"error": why, "code": "usage_cap"}
             out = agent.start(str(b.get("materials") or ""), secret(), job_description=str(b.get("job_description") or ""),
-                              target_title=str(b.get("target_title") or ""), additional=str(b.get("additional") or ""))
+                              target_title=str(b.get("target_title") or ""), additional=str(b.get("additional") or ""), owner=str(claims.get("sub")))
             # Counted only once a draft exists; a model error or bad input costs nothing.
             resume_spend(str(claims.get("sub")))
             return 200, out
         if action == "reply":
-            return 200, agent.reply(str(b.get("session") or ""), str(b.get("message") or ""), secret())
+            return 200, agent.reply(str(b.get("session") or ""), str(b.get("message") or ""), secret(), owner=str(claims.get("sub")))
         resume = b.get("resume") if isinstance(b.get("resume"), dict) else {}
         return 200, agent.resume_session(resume, secret(), materials=str(b.get("materials") or ""),
-                                         job_description=str(b.get("job_description") or ""), target_title=str(b.get("target_title") or ""))
+                                         job_description=str(b.get("job_description") or ""), target_title=str(b.get("target_title") or ""), owner=str(claims.get("sub")))
     except agent.AgentError as e:
         return (401 if e.code == "session" else 429 if e.code == "limit" else 400), {"error": str(e), "code": e.code}
     except ClaudeError as e:

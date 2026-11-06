@@ -160,3 +160,32 @@ class BuildAction(ResumeApi):
     def test_build_rejects_an_empty_resume(self):
         code, out = self.call(action="build", resume={})
         self.assertEqual(code, 400)
+
+
+class PortedGuards(unittest.TestCase):
+    """Sessions belong to the member who started them; empty drafts are errors; the script template is safe."""
+
+    def setUp(self):
+        self.real = claude.ask_structured
+        claude.ask_structured = fake_ask
+        api._calls.clear()
+
+    def tearDown(self):
+        claude.ask_structured = self.real
+
+    def test_session_cannot_be_driven_by_another_member(self):
+        code, out = api.handle({"token": token("member-1"), "action": "start", "materials": SOURCE})
+        self.assertEqual(code, 200)
+        code, out2 = api.handle({"token": token("member-2"), "action": "reply", "session": out["session"], "message": "Yes"})
+        self.assertEqual(code, 401)
+        self.assertEqual(out2["code"], "session")
+
+    def test_empty_draft_is_an_error_not_a_resume(self):
+        claude.ask_structured = lambda system, prompt, schema: {"status": "draft", "resume": {}, "verification_notes": []}
+        code, out = api.handle({"token": token(), "action": "start", "materials": SOURCE})
+        self.assertEqual(code, 502, out)
+        self.assertNotIn("session", out)
+
+    def test_a_data_placeholder_in_the_title_cannot_break_the_script(self):
+        code, out = api.handle({"token": token(), "action": "build", "resume": copy.deepcopy(APPROVED), "target_title": "__DATA__"})
+        self.assertEqual(code, 200, out.get("message"))

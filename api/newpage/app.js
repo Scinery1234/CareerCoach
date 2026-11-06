@@ -19,7 +19,7 @@ import { getAvailableSlots } from '../../lib/availability.js'
 import { sessionState, bookingProblem } from '../../lib/newpage-members.js'
 import { sendConfirmation } from '../../lib/resend.js'
 import { stripe, renewSessionParams, hoursSessionParams } from '../../lib/newpage-stripe.js'
-import { cleanHours } from '../../lib/newpage-pricing.js'
+import { cleanHours, PRICE } from '../../lib/newpage-pricing.js'
 import { createOutlookEvent } from '../../lib/outlook.js'
 import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
 import {
@@ -166,6 +166,7 @@ export default async function handler(req, res) {
     }
   }
 
+  try {
   switch (b.action) {
     case 'me':
       return res.json(await me(member, coachOf(b.coach)))
@@ -580,7 +581,7 @@ export default async function handler(req, res) {
       const time = `${String(hour).padStart(2, '0')}:00`
       const { data: booking, error } = await supabase.from('bookings').insert({
         client_id: client.id, session_type_id: type.id, date, start_time: time, duration_mins: type.duration_mins,
-        meet_link: process.env.ZOOM_PERSONAL_LINK, amount_cents: 0, tier: 'free', status: 'confirmed', newpage_member_id: member.id,
+        meet_link: process.env.ZOOM_PERSONAL_LINK, amount_cents: isTools(member) ? PRICE.hourCents : 0, tier: isTools(member) ? 'full_rate' : 'free', status: 'confirmed', newpage_member_id: member.id,
         notes: 'AI Career Coach included session'
       }).select().single()
       if (error || !booking) { console.error('Session booking failed:', error); return res.status(500).json({ error: 'Could not book that. Please try again.' }) }
@@ -813,5 +814,10 @@ export default async function handler(req, res) {
 
     default:
       return res.status(400).json({ error: 'Unknown action' })
+  }
+  } catch (err) {
+    if (err?.status) return res.status(err.status).json({ error: err.message })
+    console.error(`${b.action} failed:`, err)
+    return res.status(500).json({ error: 'Something went wrong. Please try again in a minute.' })
   }
 }
