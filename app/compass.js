@@ -1,6 +1,7 @@
 // The Compass: ten short steps from values to first steps, saved to the
 // member's account. Suggestions come from the server (Claude).
 import { h, todayStr, addDays, words, copyText } from './ui.js'
+import { done as obDone, mark as obMark, spotlight } from './onboarding.js'
 
 const VALUES = ['Achievement', 'Adventure', 'Balance', 'Beauty', 'Belonging', 'Calm', 'Care', 'Community', 'Courage', 'Creativity', 'Culture', 'Curiosity', 'Faith', 'Fairness', 'Family', 'Freedom', 'Friendship', 'Fun', 'Growth', 'Health', 'Home', 'Honesty', 'Hope', 'Humour', 'Independence', 'Joy', 'Justice', 'Kindness', 'Learning', 'Love', 'Loyalty', 'Making a difference', 'Money', 'Nature', 'Peace', 'Purpose', 'Respect', 'Security', 'Simplicity', 'Spirituality', 'Stability', 'Success', 'Teamwork', 'Trust', 'Wisdom']
 export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need', 'Strengths', 'Mix ideas', 'Choose', 'Plan', 'First steps', 'Calendar']
@@ -116,17 +117,19 @@ export function compassScreen(ctx) {
   const step = C.step
   const rr = () => { save(ctx); ctx.render() }
   const quiet = () => save(ctx, false)
-  const go = n => { C.step = Math.max(0, Math.min(9, n)); T.err = ''; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
+  const go = n => { if (step === 0 && n === 1) obMark(ctx, 'done', 'compass_start'); if (n === 3 && step === 2) T.pause = true; C.step = Math.max(0, Math.min(9, n)); T.err = ''; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
   const body = []
 
   if (step === 0) {
-    body.push(h('h3', {}, 'What matters most to you?'), h('p', { class: 'muted' }, 'Tap the values that feel like you. Choose between 5 and 10, then put them in order. The top one is your #1.'),
+    body.push(h('h3', {}, 'What matters most to you?'),
+      spotlight(ctx, 'compass_start', 'Ten short steps. Most people do the first three in one sitting and the rest over a week. It saves as you go, and Sky will know what you find.'),
+      h('p', { class: 'muted' }, 'Tap the values that feel like you. Choose between 5 and 10, then put them in order. The top one is your #1.'),
       h('div', { class: 'chips' }, [...VALUES, ...C.values.filter(v => !VALUES.includes(v))].map(v => {
         const on = C.values.includes(v)
         return h('button', { class: 'chip', type: 'button', 'aria-pressed': String(on), disabled: !on && C.values.length >= 10, onclick: () => { if (on) C.values = C.values.filter(x => x !== v); else C.values.push(v); rr() } }, v)
       })),
       addRow(ctx, 'cp-value', 'Missing one? Add your own', v => { if (C.values.length < 10 && !C.values.includes(v)) C.values.push(v); save(ctx) }),
-      C.values.length > 0 && [h('span', { class: 'label' }, 'Your values in order'), rankList(C.values, rr, 'Your values in order')])
+      C.values.length > 0 && [h('span', { class: 'label' }, 'Your values in order'), spotlight(ctx, 'compass_start', 'Your top one shapes everything after this. Use the arrows to put it first.'), rankList(C.values, rr, 'Your values in order')])
   } else if (step === 1) {
     body.push(h('h3', {}, 'Who are you?'), h('p', { class: 'muted' }, 'Finish the sentence “I am…” a few times, like “I am a mum” or “I am curious”: who you’ve been, who you are now, or who you’d love to be. Think about all of your life, not just work. Then put them in order of what feels most true today.'),
       addRow(ctx, 'cp-iam', 'e.g. a mum, a gardener, curious', v => { const t = iam(v); if (t && !C.iAm.includes(t) && C.iAm.length < 12) C.iAm.push(t); save(ctx) }, 'I am'),
@@ -139,6 +142,9 @@ export function compassScreen(ctx) {
       h('div', { class: 'field' }, h('textarea', { id: 'cp-north', rows: '8', maxlength: '3000', 'aria-label': 'Your North Star', placeholder: 'Write in your own words…', oninput: e => { C.north = e.target.value; wc.textContent = `${words(C.north)} words`; quiet(); refreshFooter() } }, C.north)), wc)
   } else if (step === 3) {
     const N = C.needs
+    if (T.pause && !obDone(ctx, 'compass')) body.push(h('div', { class: 'tool-callout' },
+      h('div', {}, h('b', {}, 'That’s the heart of it.'), h('p', { class: 'small' }, 'Your values, who you are and your North Star are saved. The next steps turn them into a direction and three first steps. Keep going now, or come back any time.')),
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.pause = false; ctx.render() } }, 'Keep going'), h('button', { class: 'link-btn', type: 'button', onclick: () => { T.pause = false; ctx.go('today') } }, 'Back to Today'))))
     const opts = (key, list) => h('div', { class: 'chips' }, list.map(v => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(N[key] === v), onclick: () => { N[key] = v; rr() } }, v)))
     body.push(h('h3', {}, 'What do you need from work?'), h('p', { class: 'muted' }, 'The practical things a job has to have for it to work in your life.'),
       h('div', { class: 'two' },
@@ -209,7 +215,7 @@ export function compassScreen(ctx) {
         ? h('p', { class: 'soft' }, 'Added to your planner. ', h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.go('tools', 'planner') }, 'Open the planner'))
         : h('button', { class: 'btn btn-primary', type: 'button', disabled: T.busy === 'place', onclick: async () => {
             T.busy = 'place'; ctx.render()
-            try { for (const s of T.sched) await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); C.placed = true; C.done = true; save(ctx) } catch (e) { T.err = e.message }
+            try { for (const s of T.sched) await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); C.placed = true; C.done = true; save(ctx); obMark(ctx, 'done', 'compass'); if (ctx.S.me?.facts) ctx.S.me.facts.compassDone = true } catch (e) { T.err = e.message }
             T.busy = ''; ctx.render()
           } }, T.busy === 'place' ? 'Adding…' : 'Add to my planner')),
       steps.length > 0 && summary(ctx, C))

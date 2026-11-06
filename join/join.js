@@ -2,7 +2,9 @@
 // Prices shown here are only for display. The server works out what you're charged.
 const $ = id => document.getElementById(id)
 const PRICE = { program: 500, hour: 250, max: 8 }
-const S = { hours: 0, code: null, codeOk: false, busy: false, plan: 'tools' }
+const S = { hours: 0, code: null, codeOk: false, busy: false, plan: 'tools', intent: '' }
+// The ad angle from the landing page (?v=), kept for the thank-you page too.
+try { const v = new URLSearchParams(location.search).get('v'); if (v) sessionStorage.setItem('np_intent', v); S.intent = sessionStorage.getItem('np_intent') || '' } catch { /* private mode */ }
 const money = n => `$${n.toLocaleString('en-AU')}`
 const text = (el, t) => { el.textContent = t }
 
@@ -71,7 +73,7 @@ $('join-form').addEventListener('submit', async e => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { text(err, 'Add the email you want to use for AI Career Coach.'); err.hidden = false; $('j-email').focus(); return }
   S.busy = true; render()
   try {
-    const d = await post({ action: 'start', plan: S.plan, name, email, hours: S.plan === 'tools' ? 0 : S.hours, code: S.plan !== 'tools' && S.codeOk ? S.code : undefined, website: $('j-website').value })
+    const d = await post({ action: 'start', plan: S.plan, name, email, intent: S.intent || undefined, hours: S.plan === 'tools' ? 0 : S.hours, code: S.plan !== 'tools' && S.codeOk ? S.code : undefined, website: $('j-website').value })
     if (d.joined) { showDone({ scholarship: true, email, session: d.session }); return }
     if (d.url) { location.href = d.url; return }
     throw new Error('Something went wrong. Please try again.')

@@ -5,11 +5,12 @@ import { compassScreen, compassStatus, COMPASS_STEPS } from './compass.js'
 import { docsScreen } from './docs.js'
 import { sessionScreen } from './session.js'
 import { sectionsScreen, sectionKinds } from './sections.js'
-import { openSky, skySeen } from './sky.js'
+import { openSky } from './sky.js'
 import { focusIcon } from './icons.js'
 import { notesScreen, noteFrom, flushNotes } from './notes.js'
 import { contextScreen, markContextStale } from './context.js'
 import { copyText } from './ui.js'
+import { firstLineCard, todayCard, strip, done as obDone, mark as obMark, spotlight, intentFocus, firstLine } from './onboarding.js'
 
 const KEY = 'np_app_session'
 const app = document.getElementById('app')
@@ -315,17 +316,20 @@ function toolsToday(me, first) {
   const today = todayStr()
   const due = me.tasks.filter(t => !t.done && t.due && t.due <= today)
   const u = me.usage
+  if (!me.member.demo && !obDone(ctx, 'app')) return h('section', { class: 'screen' }, firstLineCard(ctx))
+  const goal = firstLine(ctx)
   return h('section', { class: 'screen' },
     S.error && h('p', { class: 'error', role: 'alert' }, S.error),
     h('div', { class: 'today-grid' },
       h('div', { class: 'week-card' },
         h('div', { class: 'week-head' }, h('h2', {}, first ? `Hi ${first}.` : 'Hi.'), h('span', { class: 'pill' }, 'Member')),
-        h('p', {}, me.plan ? `Your check-in put you in ${me.plan.name}: ${me.plan.meaning}` : 'Do the 2-minute check-in under Me, so Sky knows where you’re starting from.'),
+        h('p', {}, goal ? ['Going for: ', h('b', {}, goal)] : me.plan ? `Your check-in put you in ${me.plan.name}: ${me.plan.meaning}` : 'Sky is here any time, and your tools are under Tools.'),
         due.length ? [h('span', { class: 'label' }, 'Due today'), taskList(due, 6)] : h('p', { class: 'small muted' }, 'Nothing due today. Add tasks in the planner, or ask Sky to help you plan the week.'),
         h('div', { class: 'row' },
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky'),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Open the Compass'))),
-      gettingStarted(me),
+      todayCard(ctx),
+      strip(ctx),
       u && h('div', { class: 'card' }, h('span', { class: 'label' }, 'This month'),
         h('p', { class: 'small' }, `Sky: ${u.used.messages} of ${u.caps.messages} messages · resumes: ${u.used.resumes} of ${u.caps.resumes} · tailored: ${u.used.tailored || 0} of ${u.caps.tailored} · cover letters: ${u.used.covers} of ${u.caps.covers}. Everything else is unlimited. Resets on the 1st.`)),
       h('div', { class: 'card' }, h('span', { class: 'label' }, 'Want a person in the loop?'),
@@ -386,6 +390,15 @@ function planScreen() {
 // ── Coach ────────────────────────────────────────────────────────
 function coachScreen() {
   const me = S.me
+  const fresh = !obDone(ctx, 'sky') && !me.member.demo
+  if (fresh && !S.skyPrimed) {
+    // First time here: open on the focus the ad promised, with a sentence started for them.
+    S.skyPrimed = true
+    const f = intentFocus(ctx)
+    if (f !== S.coach && !me.messages.length) { S.coach = f; act('me').then(() => render()).catch(() => {}) }
+    const line = firstLine(ctx)
+    if (!S.coachDraft && !me.messages.length) S.coachDraft = line ? `I’m going for ${line}. The hard part is ` : ''
+  }
   const info = me.coaches.find(c => c.id === S.coach) || me.coaches[0]
   const starters = info.starters
   const send = async text => {
@@ -398,6 +411,7 @@ function coachScreen() {
     try {
       const data = await act('coach', { message: text, coach: S.coach })
       if (data?.crisis) S.crisis = true
+      else obMark(ctx, 'done', 'sky')
     } catch (err) {
       me.messages = me.messages.slice(0, -1)
       S.coachDraft = text
@@ -412,9 +426,10 @@ function coachScreen() {
       h('div', { class: 'sky-focus' },
         h('button', { class: 'chip focus-btn', type: 'button', 'aria-haspopup': 'dialog', onclick: () => openSky(ctx) }, focusIcon(info.id, 26), h('span', { class: 'muted' }, 'Focus: '), h('b', {}, info.name), ' ▾'),
         h('button', { class: 'link-btn blue', type: 'button', onclick: () => openSky(ctx) }, 'What can Sky help with?'))),
-    h('p', { class: 'small muted' }, `${info.blurb} Sky is an AI. It’s coaching, not therapy, and it can’t replace a human coach.`),
+    fresh && S.coach !== 'career' && h('p', { class: 'soft', role: 'status' }, `Sky has started in ${info.name} focus, because that’s what you came for. Change it any time with the Focus button.`),
+    !fresh && h('p', { class: 'small muted' }, `${info.blurb} Sky is an AI. It’s coaching, not therapy, and it can’t replace a human coach.`),
     me.member.memoryRestored && !S.restoredSeen && h('p', { class: 'soft', role: 'status' }, 'Welcome back. Sky remembers you, and your chats and notes are exactly as you left them.'),
-    !me.member.privacy && h('div', { class: 'tool-callout' },
+    !me.member.privacy && !fresh && me.messages.length >= 4 && h('div', { class: 'tool-callout' },
       h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what a human coach could see, and tell Sky about you: your resume, your Myers-Briggs type and more. Sky keeps notes as you chat, so you never repeat yourself.')),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'context') }, 'Set up Sky')),
     !me.coachOn && h('p', { class: 'soft' }, 'The coach isn’t switched on yet. Everything else in AI Career Coach works.'),
@@ -430,6 +445,7 @@ function coachScreen() {
       h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type a message…', 'aria-label': 'Message Sky', disabled: !me.coachOn, oninput: e => { S.coachDraft = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; const sendBtn = document.getElementById('coach-send'); if (sendBtn) sendBtn.disabled = S.coachSending || !S.coachDraft.trim() },
         onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(S.coachDraft) } } }, S.coachDraft),
       h('button', { id: 'coach-send', class: 'btn btn-primary', type: 'submit', disabled: S.coachSending || !me.coachOn || !S.coachDraft.trim() }, 'Send')),
+    spotlight(ctx, 'sky', 'Sky is an AI. It keeps short notes as you talk; you can see and delete them under Me. Coaching, not therapy.'),
     me.messages.length > 0 && shareBlock(me),
     me.messages.length > 0 && h('button', { class: 'link-btn', type: 'button', onclick: async () => { if (!S.confirmClear) { S.confirmClear = true; render(); return } S.confirmClear = false; try { await act('coach_clear', { coach: S.coach }) } catch (err) { S.error = err.message } render() } },
       S.confirmClear ? 'Tap again to clear this conversation' : 'Clear this conversation'))
@@ -590,8 +606,8 @@ function renderTabs() {
   signoutBtn.hidden = !show
   if (!show) return
   tabbar.replaceChildren(h('div', { class: 'tabbar-in' }, TABS.filter(([k]) => !(k === 'plan' && S.me.member.plan === 'tools')).map(([k, label]) => {
-    const needsCheckin = k === 'me' && !S.me.plan
-    const btn = h('button', { class: 'tab', type: 'button', 'aria-current': S.tab === k ? 'page' : null, onclick: () => { go(k); if (k === 'coach' && !skySeen()) setTimeout(() => openSky(ctx), 250) } }, label, needsCheckin && h('span', { class: 'dotbadge', 'aria-label': 'Check-in needed' }))
+    const needsCheckin = k === 'me' && !S.me.plan && (S.me.member.plan !== 'tools' || obDone(ctx, 'sky'))
+    const btn = h('button', { class: 'tab', type: 'button', 'aria-current': S.tab === k ? 'page' : null, onclick: () => go(k) }, label, needsCheckin && h('span', { class: 'dotbadge', 'aria-label': 'Check-in needed' }))
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true')
     svg.innerHTML = ICONS[k] // fixed strings above, never user data

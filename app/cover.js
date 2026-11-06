@@ -5,6 +5,7 @@
 // you. The letter is written from that evidence only, in Australian format.
 import { h, copyText } from './ui.js'
 import { templatePicker, pagePreview, saveB64, DOCX_TYPE, safeName, fileToB64, resumeFileProblem } from './docfiles.js'
+import { mark as obMark, spotlight } from './onboarding.js'
 
 const L = {
   step: 1, job: '', role: '', company: '', themes: [], reqs: [], ev: {}, openKw: 0, addKw: '',
@@ -94,12 +95,13 @@ function reviewCard(ctx, cur) {
       const evidence = L.themes.map(t => ({ keyword: t.keyword, ...(L.ev[t.keyword] || {}) }))
       const d = await ctx.call('/api/newpage/app', { action: 'cover_review', id: cur.id, job: L.job, keywords: L.themes.map(t => t.keyword), evidence, resume: ownResume() ? L.resume : '', resume_id: L.resumeId })
       L.review = { id: cur.id, data: d.review }
+      obMark(ctx, 'done', 'cover_review')
     } catch (e) { L.err = e.code === 'coach_off' ? 'The writer isn’t switched on yet.' : e.message }
     L.reviewing = false; ctx.render()
     document.getElementById('cv-review')?.scrollIntoView({ block: 'nearest' })
   }
   const btn = h('button', { class: 'btn btn-secondary', type: 'button', disabled: L.reviewing, onclick: run }, L.reviewing ? 'Reading it as a recruiter…' : r ? 'Review it again' : 'Review this letter')
-  if (!r) return h('div', { class: 'field' }, btn, h('p', { class: 'small muted' }, 'A recruiter’s read: does this letter make your case, and what would make it stronger.'))
+  if (!r) return h('div', { class: 'field' }, btn, h('p', { class: 'small muted' }, 'A recruiter’s read: does this letter make your case, and what would make it stronger.'), spotlight(ctx, 'cover_review', 'Most letters go up a point or two after one round of answers to the review.'))
   return h('div', { id: 'cv-review', class: 'review' },
     h('div', { class: 'row review-head' }, h('span', { class: 'label' }, 'Recruiter’s read'), r.score != null && h('span', { class: 'score' }, `${r.score} / 10`)),
     r.verdict && h('p', {}, r.verdict),
@@ -182,6 +184,7 @@ export function coverScreen(ctx) {
         contact: { phone: L.phone, location: L.location, linkedin: L.linkedin }
       })
       L.cur = d.doc; L.docs = [d.doc, ...L.docs.filter(x => x.id !== d.doc.id)]; L.draft = null; L.review = null; L.note = ''
+      obMark(ctx, 'done', 'cover')
     } catch (e) { L.err = errText(e) }
     L.busy = false; ctx.render()
     if (L.cur && !L.err) document.getElementById('doc-result')?.scrollIntoView({ block: 'start' })
@@ -202,6 +205,7 @@ export function coverScreen(ctx) {
         name: L.name, currentTitle: L.currentTitle, resume, resume_id: L.resumeId, template: L.template, contact: { phone: L.phone, location: L.location, linkedin: L.linkedin }
       })
       L.cur = d.doc; L.docs = [d.doc, ...L.docs.filter(x => x.id !== d.doc.id)]; L.draft = null; L.review = null; L.themes = []; L.note = 'A quick letter from your resume alone. Review it below to see where it stands, or go through the three steps for a stronger one.'
+      obMark(ctx, 'done', 'cover')
     } catch (e) { L.err = errText(e) }
     L.quick = false; ctx.render()
     if (L.cur && !L.err) document.getElementById('doc-result')?.scrollIntoView({ block: 'start' })
@@ -215,6 +219,7 @@ export function coverScreen(ctx) {
     const fileInput = h('input', { type: 'file', id: 'cv-file', class: 'sr-only', onchange: e => { upload(ctx, e.target.files[0]); e.target.value = '' } })
     const src = resumeSource()
     body = [
+      L.handed && h('p', { class: 'handoff', role: 'status' }, `Using ${L.savedResume ? '“' + L.savedResume.title + '”' : 'your tailored resume'} and the ad you pasted. Step 1 is done: read the ad for a stronger letter, or get a quick one.`),
       h('div', { class: 'doc-step' }, h('span', { class: 'num' }, '1'), h('div', {}, h('b', {}, 'Your resume'), h('p', { class: 'small muted' }, 'This comes first. We check it against the job ad, and the questions on the next step come from where it is strong, thin or silent.'))),
       src && h('p', { class: 'small' }, src),
       h('div', { class: 'row' }, fileInput,

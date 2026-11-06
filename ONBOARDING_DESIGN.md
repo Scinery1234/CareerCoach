@@ -3,6 +3,7 @@
 Date: 6 November 2026
 Applies to: `claude/fervent-gates-ejr1dq` (the member app under `app/`, the join and demo pages)
 Companion to: `USABILITY_REVIEW.md`
+Status: sections 3, 4.1 to 4.4, 4.6 (handoff) and 4.7 (intro and pause) are implemented in `app/onboarding.js`, `app/onboarding-logic.js` and the tools; the rest are designed, not built.
 
 ## 1. The idea in one paragraph
 

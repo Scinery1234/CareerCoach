@@ -409,3 +409,7 @@ ALTER TABLE newpage_usage ENABLE ROW LEVEL SECURITY;
 -- ── Tailored resumes (a saved resume adjusted for one job ad), counted separately ──
 ALTER TABLE newpage_usage DROP CONSTRAINT IF EXISTS newpage_usage_kind_check;
 ALTER TABLE newpage_usage ADD CONSTRAINT newpage_usage_kind_check CHECK (kind IN ('messages','resumes','tailored','covers'));
+
+-- ── Onboarding: the ad angle a member came from, and which first wins they have had ──
+ALTER TABLE newpage_members ADD COLUMN IF NOT EXISTS intent text;              -- resume, direction, stuck or interview
+ALTER TABLE newpage_members ADD COLUMN IF NOT EXISTS onboarding jsonb DEFAULT '{}';  -- { done: {module: date}, dismissed: {...}, seen: {module: n} }

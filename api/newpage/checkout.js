@@ -4,6 +4,7 @@ import { PRICE, TRIAL_DAYS } from '../../lib/newpage-pricing.js'
 import { stripe, toolsSessionParams } from '../../lib/newpage-stripe.js'
 import { applyCheckout } from '../../lib/newpage-payments.js'
 import { signSession } from '../../lib/newpage-auth.js'
+import { INTENTS } from '../../lib/newpage-onboarding.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const clip = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '')
@@ -47,10 +48,11 @@ export default async function handler(req, res) {
 
   const email = clip(b.email, 200).toLowerCase()
   const name = clip(b.name, 80)
+  const intent = INTENTS.includes(b.intent) ? b.intent : ''
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Add the email you want to use for AI Career Coach.' })
   if (!name) return res.status(400).json({ error: 'Add your name.' })
   try {
-    const session = await stripe().checkout.sessions.create(toolsSessionParams({ email, name }))
+    const session = await stripe().checkout.sessions.create(toolsSessionParams({ email, name, intent }))
     return res.json({ url: session.url })
   } catch (err) {
     console.error('Checkout failed:', err)

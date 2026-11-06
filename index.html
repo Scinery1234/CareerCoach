@@ -208,6 +208,8 @@ const V = {
 }
 const v = new URLSearchParams(location.search).get('v')
 if (V[v]) { document.getElementById('h1').textContent = V[v][0]; document.getElementById('lead').textContent = V[v][1] }
+// The angle travels to /join (and from there onto the member), so the app's first steps match the ad.
+if (v && v in V) document.querySelectorAll('a[href="/join"]').forEach(a => { a.href = '/join?v=' + encodeURIComponent(v) })
 // The sticky bar appears once the hero button has scrolled away (phones only; hidden on wide screens by CSS).
 const hero = document.querySelector('#hero .btn-primary'), bar = document.getElementById('sticky')
 new IntersectionObserver(e => { bar.classList.toggle('on', !e[0].isIntersecting && e[0].boundingClientRect.top < 0) }, { threshold: 0 }).observe(hero)

@@ -383,3 +383,22 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
   .paper.app { padding-bottom: 32px; padding-left: 92px; }
   .composer, .cp-footer, .ra-reply { bottom: 0; }
 }
+
+/* ── Onboarding: a spotlight line, a first-win card, the first-wins strip ── */
+.spot { margin: 0; font-size: 15px; color: var(--muted); padding-left: 12px; border-left: 3px solid var(--hl); line-height: 1.45; }
+.win { margin: 0; }
+.win .btn-primary { background: var(--ink); color: #fff; }
+.win .row { align-items: center; gap: 8px 16px; }
+.win .btn { min-height: 48px; font-size: 16px; padding: 8px 18px; }
+.first-line { gap: 10px; }
+.first-line h2 { font-size: 26px; }
+.first-line input { min-height: 52px; border: 1.5px solid #C9D3E3; border-radius: 12px; padding: 10px 14px; font-size: 17px; width: 100%; }
+.first-line .row { align-items: center; gap: 8px 16px; }
+.strip-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.strip-list li { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.strip-list li > span:nth-child(2) { flex: 1 1 auto; }
+.strip-list .tick { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: 0 0 auto; }
+.strip-list .won .tick { background: var(--hl); }
+.strip-list .won { color: var(--muted); } .strip-list .won > span:nth-child(2) { text-decoration: line-through; text-decoration-color: var(--hl); text-decoration-thickness: 3px; }
+.strip-list .later { color: var(--muted); } .strip-list .later .tick { border-color: var(--rule); }
+.handoff { background: var(--hl); border-radius: 12px; padding: 10px 14px; font-size: 15px; }

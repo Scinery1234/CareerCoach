@@ -28,7 +28,8 @@ import {
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
-import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
+import { TAILOR_SYSTEM, TAILOR_SCHEMA, RESUME_SCHEMA, STRUCTURE_SYSTEM, structurePrompt, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
+import { cleanOnboarding, markOnboarding, MODULES } from '../../lib/newpage-onboarding.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
 
 const COVER_TEMPLATES = ['modern', 'classic', 'creative', 'minimal', 'executive']
@@ -100,9 +101,16 @@ async function memberResume(member, pasted, resumeId = '') {
 }
 
 async function me(member, coach = 'career') {
-  const data = await load(member, coach)
+  const [data, profile, cp, docs] = await Promise.all([
+    load(member, coach), getTool(member, 'profile'), getTool(member, 'compass'),
+    supabase.from('newpage_docs').select('id, content').eq('member_id', member.id).eq('kind', 'resume').limit(20)
+  ])
   const usage = isTools(member) ? { used: await usageFor(member.id), caps: TOOLS_CAPS } : null
-  return { ...buildMe({ member, ...data, sessions: sessionState(member.sessions_included, data.bookings), coachOn: !!process.env.ANTHROPIC_API_KEY }), coach, usage }
+  // What onboarding needs to know to pick the next first win.
+  const built = (docs.data || []).filter(d => d.content?.resume?.candidate?.full_name && !d.content?.tailored).length
+  const compass = cp ? cleanCompass(cp) : null
+  const facts = { hasResume: clipText(profile?.text, 12000).length >= 80 || (docs.data || []).length > 0, builtResumes: built, tailored: (docs.data || []).filter(d => d.content?.tailored).length, compassStep: compass?.step || 0, compassDone: !!compass?.done, checkins: data.checkins.length, tasks: data.tasks.length }
+  return { ...buildMe({ member, ...data, sessions: sessionState(member.sessions_included, data.bookings), coachOn: !!process.env.ANTHROPIC_API_KEY }), coach, usage, facts }
 }
 
 // Everything the Your context screen shows. Shares are listed by date and kind only.
@@ -169,6 +177,32 @@ export default async function handler(req, res) {
   switch (b.action) {
     case 'me':
       return res.json(await me(member, coachOf(b.coach)))
+
+    // ── Onboarding: which first wins they have had, and the one line they start with ──
+    case 'onboarding_set': {
+      if (!MODULES.includes(b.module) || !['done', 'dismissed', 'seen', 'reset'].includes(b.kind)) return res.status(400).json({ error: 'Unknown onboarding step.' })
+      const next = markOnboarding(cleanOnboarding(member.onboarding, member.intent), b.kind, b.module)
+      await supabase.from('newpage_members').update({ onboarding: next }).eq('id', member.id)
+      return res.json({ onboarding: next })
+    }
+    // "What are you going for?" The answer becomes Sky's first note and a goal in the planner.
+    case 'first_line': {
+      const text = clip(b.text, 200)
+      let noted = false
+      if (text) {
+        const note = cleanNote(`Going for: ${text}`)
+        try {
+          const v = await writeVault(member)
+          const { memory } = await load(member)
+          if (!isDuplicateNote(note, memory.map(m => m.note))) { await supabase.from('newpage_memory').insert({ member_id: member.id, note: sealText(v, 'mem', note) }); noted = true }
+        } catch (err) { console.error('First line note failed (goal still saved):', err.message) }
+        const { data: goals } = await supabase.from('newpage_goals').select('id').eq('member_id', member.id).eq('title', text).limit(1)
+        if (!goals?.length) await supabase.from('newpage_goals').insert({ member_id: member.id, title: text })
+      }
+      const next = markOnboarding(cleanOnboarding(member.onboarding, member.intent), 'done', 'app')
+      await supabase.from('newpage_members').update({ onboarding: next }).eq('id', member.id)
+      return res.json({ ...(await me({ ...member, onboarding: next }, coachOf(b.coach))), noted })
+    }
 
     case 'progress': {
       const week = Number(b.week), step = Number(b.step)
@@ -380,6 +414,34 @@ export default async function handler(req, res) {
       }
       const { data: saved } = await supabase.from('newpage_docs').insert({ member_id: member.id, kind, title, content }).select('id, kind, title, content, created_at').single()
       return res.json({ doc: saved || { kind, title, content } })
+    }
+
+    // The resume they uploaded or pasted, transcribed into the agreed shape and saved as a
+    // resume the writer could have made, so "Tailor for a job" works without the full writer.
+    // Nothing is written: it is a copy, checked against the text for roles that were not there.
+    case 'resume_structure': {
+      if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'The writer isn’t switched on yet.', code: 'coach_off' })
+      if (!rateLimit(req, res, { max: 10, windowMs: 60 * 60 * 1000, key: `np-structure-${member.id}` })) return
+      const pasted = clipText(b.text, 12000)
+      const text = pasted || clipText((await getTool(member, 'profile'))?.text, 12000)
+      if (text.length < 80) return res.status(400).json({ error: 'Add your resume first: upload it, or paste the text.', code: 'no_resume' })
+      if (pasted) await setTool(member, 'profile', { text: pasted })
+      let resume
+      try {
+        resume = cleanStoredResume({ resume: await askJson({ system: STRUCTURE_SYSTEM, prompt: structurePrompt(text), schema: RESUME_SCHEMA, maxTokens: 6000, effort: 'low' }) }).resume
+      } catch (err) {
+        console.error('Resume structure failed:', err)
+        return res.status(502).json({ error: aiMessage(err) })
+      }
+      // Every employer must appear in the text, or the transcription is not trusted.
+      const low = text.toLowerCase()
+      const roles = resume.professional_experience.filter(r => r.employer && low.includes(r.employer.toLowerCase().slice(0, 12)))
+      if (!resume.candidate.full_name || !roles.length) return res.status(422).json({ error: 'We couldn’t read your roles from that text. Check it has your jobs, employers and dates, or write a new resume in the Resume writer.' })
+      resume.professional_experience = roles
+      const content = cleanStoredResume({ resume, target_title: resume.candidate.generic_job_title, filename: '' })
+      const title = `Resume: as uploaded${resume.candidate.generic_job_title ? ' (' + resume.candidate.generic_job_title + ')' : ''}`.slice(0, 160)
+      const { data: saved } = await supabase.from('newpage_docs').insert({ member_id: member.id, kind: 'resume', title, content }).select('id, kind, title, content, created_at').single()
+      return res.json({ doc: saved || { kind: 'resume', title, content } })
     }
 
     // Tailor a saved resume for one job ad: one short call that selects, reorders and rewords

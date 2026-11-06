@@ -10,6 +10,8 @@
 // The gates live on the server; this screen shows the conversation and the results.
 import { h, copyText } from './ui.js'
 import { saveB64, DOCX_TYPE, fileToB64, resumeFileProblem, safeName } from './docfiles.js'
+import { done as obDone, mark as obMark, spotlight } from './onboarding.js'
+import { pickSampleAd } from './sample-ads.js'
 
 const API = '/api/newpage/resume'
 const QUICK = { AWAITING_CONTENT_APPROVAL: 'Yes', EXECUTION_FAILED: 'Try again' }
@@ -39,7 +41,7 @@ async function load(ctx) {
     L.text = p.data.text || ''
     L.docs = d.docs
   } catch (e) { L.text = ''; L.docs = []; L.err = e.message }
-  if (!L.mode) L.mode = bases().length ? 'tailor' : 'new'
+  if (!L.mode) L.mode = 'tailor' // the quick win first; the form takes the resume in if none is on file
   if (!L.baseId && bases().length) L.baseId = bases()[0].id
   L.loading = false
   ctx.render()
@@ -54,7 +56,10 @@ async function upload(ctx, file, into) {
   L.uploading = into; L.err = ''; ctx.render()
   try {
     const d = await agent(ctx, { action: 'extract', filename: file.name, file: await fileToB64(file) })
-    if (into === 'job') { L.job = d.text; L.jobFile = file.name } else if (into === 'tailjob') { L.tailJob = d.text; L.tailJobFile = file.name } else { L.text = d.text; L.fileName = file.name; L.pasteOpen = true }
+    if (into === 'job') { L.job = d.text; L.jobFile = file.name } else if (into === 'tailjob') { L.tailJob = d.text; L.tailJobFile = file.name } else {
+      L.text = d.text; L.fileName = file.name; L.pasteOpen = true
+      if (L.text.trim().length >= 80) { ctx.call('/api/newpage/app', { action: 'tool_save', tool: 'profile', data: { text: L.text } }).then(() => { if (ctx.S.me?.facts) ctx.S.me.facts.hasResume = true; obMark(ctx, 'done', 'resume_in') }).catch(() => {}) }
+    }
   } catch (e) { L.err = e.message }
   L.uploading = ''; ctx.render()
 }
@@ -68,7 +73,7 @@ async function start(ctx) {
   if (L.busy) return
   if ((L.text || '').trim().length < 80) { L.err = 'Add your current resume first: upload it, or paste your roles, dates and what you achieved.'; ctx.render(); return }
   L.busy = 'Drafting your resume. This can take up to a minute.'; L.err = ''; ctx.render()
-  ctx.call('/api/newpage/app', { action: 'tool_save', tool: 'profile', data: { text: L.text } }).catch(() => {})
+  ctx.call('/api/newpage/app', { action: 'tool_save', tool: 'profile', data: { text: L.text } }).then(() => obMark(ctx, 'done', 'resume_in')).catch(() => {})
   try {
     const d = await agent(ctx, { action: 'start', materials: L.text, job_description: L.job, target_title: L.role, additional: L.extra })
     L.conv = { session: d.session, state: d.state, resume: d.resume, messages: d.messages.map(m => ({ role: 'agent', ...m })) }
@@ -91,6 +96,7 @@ async function send(ctx, text) {
     L.conv.messages.push(...d.messages.map(m => ({ role: 'agent', ...m })))
     const done = d.messages.find(m => m.kind === 'result' && m.ok)
     if (done) {
+      obMark(ctx, 'done', 'resume_new')
       try {
         const cur = (L.docs || []).find(x => x.id === L.docId)
         const s = await ctx.call('/api/newpage/app', { action: 'resume_save', id: L.docId, resume: d.resume, filename: done.filename, target_title: L.role, job_description: L.job, tailored: cur?.content?.tailored })
@@ -119,13 +125,22 @@ async function openSaved(ctx, doc) {
 // ── Tailor for a job ──
 async function tailor(ctx) {
   if (L.busy) return
-  if (!L.baseId) { L.err = 'Choose the resume to tailor.'; ctx.render(); return }
+  const own = (L.text || '').trim().length >= 80
+  if (!L.baseId && !own) { L.err = 'Add your resume first: upload it, or paste the text.'; ctx.render(); return }
   if (L.tailJob.trim().length < 60) { L.err = 'Paste the whole job ad first.'; ctx.render(); return }
-  L.busy = 'Tailoring your resume for this ad. About a minute.'; L.err = ''; ctx.render()
+  L.busy = L.baseId ? 'Tailoring your resume for this ad. About a minute.' : 'Reading your resume into shape, then tailoring it. About a minute.'; L.err = ''; ctx.render()
   try {
+    if (!L.baseId) {
+      // The uploaded resume, transcribed once into the writer's shape. Nothing is written.
+      const s = await ctx.call('/api/newpage/app', { action: 'resume_structure', text: L.text })
+      L.docs = [s.doc, ...(L.docs || [])]; L.baseId = s.doc.id
+      if (ctx.S.me?.facts) { ctx.S.me.facts.hasResume = true; ctx.S.me.facts.builtResumes = (ctx.S.me.facts.builtResumes || 0) + 1 }
+      obMark(ctx, 'done', 'resume_in')
+    }
     const d = await ctx.call('/api/newpage/app', { action: 'resume_tailor', id: L.baseId, job: L.tailJob, role: L.tailRole, company: L.tailCo })
     L.docs = [d.doc, ...(L.docs || [])]
     L.tail = d.doc; L.conv = null; L.showAll = false
+    obMark(ctx, 'done', 'tailor')
   } catch (e) { L.err = e.code === 'usage_cap' ? e.message : errText(e) }
   L.busy = ''; ctx.render(); scrollTop()
 }
@@ -216,6 +231,7 @@ function tailorView(ctx, doc) {
     h('div', { class: 'row doc-actions' },
       h('button', { class: 'btn btn-primary', type: 'button', disabled: building, onclick: () => download(ctx, doc) }, building ? 'Building the Word file…' : f ? 'Download Word file' : 'Download Word file'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => toCover(ctx, doc) }, 'Write the cover letter for this job')),
+    spotlight(ctx, 'cover', 'This ad and this resume carry across to the cover letter writer, so step 1 is already done there.'),
     L.err && h('p', { class: 'error', role: 'alert' }, L.err),
 
     h('div', { class: 'tl-block' }, h('b', {}, 'What changed'),
@@ -225,6 +241,7 @@ function tailorView(ctx, doc) {
           (c.before || c.after) ? diff(c.before, c.after) : h('p', { class: 'small muted' }, 'No text to show for this one.'))))),
 
     h('div', { class: 'tl-block' }, h('b', {}, 'How you match the ad'),
+      spotlight(ctx, 'cover_review', 'Gaps are named honestly, and nothing was added to cover them. If the same gap keeps showing up across ads, that’s a signal about direction, not a failure.'),
       match.length === 0 ? h('p', { class: 'small muted' }, 'No requirements were picked out of this ad.')
         : [h('p', { class: 'small muted' }, `${strong} of ${match.length} clearly in your resume${missing ? `, ${missing} not there` : ''}. Gaps are named honestly: nothing was added to cover them.`),
           h('ul', { class: 'tl-match' }, match.map(m => { const [label, cls] = STATUS[m.status] || STATUS.missing; return h('li', {},
@@ -300,17 +317,43 @@ function newForm(ctx) {
     h('p', { class: 'small muted' }, 'You’ll see the full draft first. Once you approve it, the Word file is made and checked straight away.'))
 }
 
+// Step 1 of tailoring when nothing is on file yet: the resume comes in here, once.
+function resumeIn(ctx) {
+  const fileInput = h('input', { type: 'file', id: 'res-file', class: 'sr-only', onchange: e => { upload(ctx, e.target.files[0], 'cv'); e.target.value = '' } })
+  const saveText = async () => {
+    if ((L.text || '').trim().length < 80) { L.err = 'Paste your roles, employers, dates and what you achieved. A few lines is enough to start.'; ctx.render(); return }
+    L.err = ''
+    try { await ctx.call('/api/newpage/app', { action: 'tool_save', tool: 'profile', data: { text: L.text } }); L.pasteOpen = false; if (ctx.S.me?.facts) ctx.S.me.facts.hasResume = true; obMark(ctx, 'done', 'resume_in') } catch (e) { L.err = e.message }
+    ctx.render()
+  }
+  return [
+    h('p', { class: 'small muted' }, 'Upload a Word or PDF file, or paste the text. We keep it so you only do this once, and nothing goes to an employer.'),
+    h('div', { class: 'row' }, fileInput, fileBtn(fileInput, 'res-file', L.uploading === 'cv' ? 'Reading your file…' : 'Upload your resume'),
+      !L.pasteOpen && h('button', { class: 'link-btn blue', type: 'button', onclick: () => { L.pasteOpen = true; ctx.render() } }, 'Or paste it')),
+    L.fileName && h('p', { class: 'small' }, `Loaded ${L.fileName}. Check the text below, since PDFs can come out a little jumbled.`),
+    L.pasteOpen && h('div', { class: 'field' }, h('label', { for: 'res-text', class: 'sr-only' }, 'Your resume text'),
+      h('textarea', { id: 'res-text', rows: '8', maxlength: '40000', placeholder: 'Roles, employers, dates, what you achieved, qualifications…', oninput: e => { L.text = e.target.value } }, L.text || ''),
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: saveText }, 'Keep this resume')))
+  ]
+}
+
 function tailorForm(ctx) {
   const list = bases()
+  const own = (L.text || '').trim().length >= 80
   const jdInput = h('input', { type: 'file', id: 'tl-jd-file', class: 'sr-only', onchange: e => { upload(ctx, e.target.files[0], 'tailjob'); e.target.value = '' } })
+  const sample = () => { const s = pickSampleAd(L.text || ''); L.tailJob = s.ad; L.tailJobFile = ''; L.tailRole = s.role; L.tailCo = s.company; L.sample = true; L.err = ''; ctx.render(); document.getElementById('tl-job')?.scrollIntoView({ block: 'nearest' }) }
   return h('form', { class: 'card doc-form', novalidate: true, onsubmit: e => { e.preventDefault(); tailor(ctx) } },
-    h('div', { class: 'doc-step' }, h('span', { class: 'num' }, '1'), h('div', {}, h('b', {}, 'The resume to tailor'),
-      h('p', { class: 'small muted' }, 'It stays as it is. The tailored version is saved separately, under it.'))),
+    h('div', { class: 'doc-step' }, h('span', { class: 'num' }, '1'), h('div', {}, h('b', {}, list.length ? 'The resume to tailor' : own ? 'Your resume' : 'Put your resume in once'),
+      h('p', { class: 'small muted' }, list.length ? 'It stays as it is. The tailored version is saved separately, under it.' : own ? 'The one you uploaded. The first time, we read it into shape (nothing is written), then tailor it.' : 'Every writer uses it from then on.'))),
+    list.length === 0 && !own && resumeIn(ctx),
+    list.length === 0 && own && h('p', { class: 'small' }, L.fileName ? `Using ${L.fileName}.` : 'Using the resume you saved.', ' ', h('button', { class: 'link-btn blue inline', type: 'button', onclick: () => { L.pasteOpen = true; L.mode = 'new'; ctx.render() } }, 'Change it')),
     list.length === 1
       ? h('p', { class: 'small' }, `${list[0].title} · ${when(list[0].created_at)}`)
-      : h('div', { class: 'field' }, h('label', { for: 'tl-base', class: 'sr-only' }, 'Resume to tailor'),
+      : list.length > 1 && h('div', { class: 'field' }, h('label', { for: 'tl-base', class: 'sr-only' }, 'Resume to tailor'),
         h('select', { id: 'tl-base', onchange: e => { L.baseId = e.target.value } }, list.map(d => h('option', { value: d.id, ...(d.id === L.baseId ? { selected: '' } : {}) }, `${d.title} · ${when(d.created_at)}`)))),
-    h('div', { class: 'doc-step' }, h('span', { class: 'num' }, '2'), h('div', {}, h('b', {}, 'The job ad'), h('p', { class: 'small muted' }, 'Paste the whole thing, including what they require, or upload it.'))),
+    h('div', { class: 'doc-step' }, h('span', { class: 'num' }, '2'), h('div', {}, h('b', {}, 'The job ad'), h('p', { class: 'small muted' }, 'Paste the whole thing, including the “about you” part. That’s what we match against. Or upload it.'))),
+    !obDone(ctx, 'tailor') && !L.tailJob && h('div', { class: 'row' }, h('button', { class: 'link-btn blue', type: 'button', onclick: sample }, 'No ad handy? Try it on a sample ad'), h('span', { class: 'small muted' }, 'See the full result in about a minute.')),
+    L.sample && L.tailJob && h('p', { class: 'small muted' }, 'A sample ad is loaded. Replace it with a real one any time.'),
     h('div', { class: 'row' }, jdInput, fileBtn(jdInput, 'tl-jd-file', L.uploading === 'tailjob' ? 'Reading the job ad…' : L.tailJobFile ? 'Upload a different job ad' : 'Upload the job ad (PDF)')),
     L.tailJobFile && h('p', { class: 'small' }, `Loaded ${L.tailJobFile}.`),
     h('div', { class: 'field' }, h('label', { for: 'tl-job', class: 'sr-only' }, 'Job ad'),
@@ -328,7 +371,7 @@ function pathPicker(ctx) {
   const opt = (mode, title, hint) => h('button', { class: 'path' + (L.mode === mode ? ' on' : ''), type: 'button', 'aria-pressed': L.mode === mode ? 'true' : 'false', onclick: () => { L.mode = mode; L.err = ''; ctx.render() } }, h('b', {}, title), h('span', { class: 'small' }, hint))
   return h('div', { class: 'path-cards' },
     opt('tailor', 'Tailor for a job', 'Keeps your resume as it is and adjusts it for one ad. About a minute.'),
-    opt('new', 'Write a new resume', 'Start from scratch, or rebuild it if your direction has changed.'))
+    opt('new', 'Write a new resume', 'About ten minutes with you in the loop. You have 3 a month.'))
 }
 
 function savedList(ctx) {
@@ -377,7 +420,6 @@ export function resumeScreen(ctx) {
   const saved = savedList(ctx)
   if (c) return h('section', { class: 'screen docs' }, head, h('div', { class: 'ra-stack' }, conv, saved))
   if (L.tail) return h('section', { class: 'screen docs' }, head, h('div', { class: 'docs-cols' }, h('div', {}, tailorView(ctx, L.tail)), h('div', {}, saved)))
-  const canTailor = bases().length > 0
-  const form = h('div', {}, canTailor && pathPicker(ctx), L.mode === 'tailor' && canTailor ? tailorForm(ctx) : newForm(ctx))
+  const form = h('div', {}, pathPicker(ctx), L.mode === 'tailor' ? tailorForm(ctx) : newForm(ctx))
   return h('section', { class: 'screen docs' }, head, h('div', { class: 'docs-cols' }, h('div', {}, form), h('div', {}, saved || h('div', { class: 'docs-empty muted small' }, 'Your saved resumes appear here.'))))
 }

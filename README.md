@@ -16,6 +16,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `api/bookings`, `api/availability.js`, `api/session-types.js`, `api/admin/*` | The booking engine for sessions with the human coach. |
 | `api/webhooks/stripe.js` | Stripe: membership paid, renewed, cancelled; sessions bought. |
 | `lib/` | Everything shared: Sky's prompts and principles, memory encryption, usage caps, emails, Stripe. |
+| `app/onboarding.js`, `app/onboarding-logic.js` | Onboarding: one question on first sign-in, then one first-win card and a four-item strip on Today, in the order the ad angle (`?v=`) suggests. State lives in `newpage_members.onboarding`; the design is in `ONBOARDING_DESIGN.md`. |
 | `content/` | The program content modules Sky and the content editor still reference. The program itself is not sold here. |
 | `sql/` | Supabase schema: `schema.sql` (bookings) then `newpage.sql` (members, docs, memory, usage). |
 | `tests/` | `npm test` (Node) and `python3 -m unittest discover -s tests/py`. |
