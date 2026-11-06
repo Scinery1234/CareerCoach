@@ -227,7 +227,6 @@ function openLesson(id) {
 
 async function openCoach(id) {
   S.coach = id; S.coachError = ''; S.crisis = false
-  if (S.me) S.me.messages = []
   go('coach')
   try { await act('me') } catch (e) { S.error = e.message }
   render(); scrollChat()
@@ -428,7 +427,7 @@ function coachScreen() {
     !me.messages.length && h('div', { class: 'starters' }, starters.map(s => h('button', { class: 'chip', type: 'button', onclick: () => send(s) }, s))),
     S.coachError && h('p', { class: 'error', role: 'alert' }, S.coachError),
     h('form', { class: 'composer', onsubmit: e => { e.preventDefault(); send(S.coachDraft) } },
-      h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type a message…', 'aria-label': 'Message Sky', disabled: S.coachSending || !me.coachOn, oninput: e => { S.coachDraft = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; const sendBtn = document.getElementById('coach-send'); if (sendBtn) sendBtn.disabled = S.coachSending || !S.coachDraft.trim() },
+      h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type a message…', 'aria-label': 'Message Sky', disabled: !me.coachOn, oninput: e => { S.coachDraft = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; const sendBtn = document.getElementById('coach-send'); if (sendBtn) sendBtn.disabled = S.coachSending || !S.coachDraft.trim() },
         onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(S.coachDraft) } } }, S.coachDraft),
       h('button', { id: 'coach-send', class: 'btn btn-primary', type: 'submit', disabled: S.coachSending || !me.coachOn || !S.coachDraft.trim() }, 'Send')),
     me.messages.length > 0 && shareBlock(me),

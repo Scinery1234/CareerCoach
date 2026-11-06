@@ -53,7 +53,10 @@ class handler(BaseHTTPRequestHandler):
             if action == "templates":
                 return respond(self, 200, {"templates": rb.TEMPLATE_LIST})
             if action == "extract":
-                text = extract_text(str(b.get("filename") or ""), base64.b64decode(b.get("file") or ""))
+                content = base64.b64decode(b.get("file") or "")
+                if len(content) > 3 * 1024 * 1024:
+                    return respond(self, 413, {"error": "That file is over 3 MB. Save a smaller copy or paste the text."})
+                text = extract_text(str(b.get("filename") or ""), content)
                 if len(text.strip()) < 40:
                     return respond(self, 422, {"error": "We couldn’t read any text in that file. If it’s a scan or a picture, paste the text instead."})
                 return respond(self, 200, {"text": text[:30000]})

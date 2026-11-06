@@ -39,6 +39,17 @@ class Docx(unittest.TestCase):
         self.assertEqual(cb.build_cover_docx_bytes(c, "classic")[:2], b"PK")
         self.assertIn("Dear Hiring Manager", cb.build_cover_html(c, "minimal"))
 
+    def test_extract_refuses_a_zip_bomb_and_junk(self):
+        import io, zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("word/document.xml", b"<w:document/>" + b" " * (21 * 1024 * 1024))
+        with self.assertRaises(ValueError) as cm:
+            api.extract_text("big.docx", buf.getvalue())
+        self.assertIn("too large", str(cm.exception))
+        with self.assertRaises(ValueError):
+            api.extract_text("junk.docx", b"not a zip at all")
+
     def test_extract_docx_and_txt(self):
         data = rb.ResumeBuilder().build_word_document_bytes(rb.DUMMY_CANDIDATE, "classic")
         self.assertIn("Atlassian", api.extract_text("a.docx", data))
