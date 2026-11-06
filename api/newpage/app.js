@@ -69,7 +69,8 @@ async function load(member, coach = 'career') {
     supabase.from('newpage_progress').select('week, step').eq('member_id', memberId),
     supabase.from('newpage_tasks').select('id, title, due, done, source, created_at, block_start, block_mins, goal_id').eq('member_id', memberId).order('created_at', { ascending: true }).limit(200),
     supabase.from('newpage_checkins').select('clarity, capacity, quadrant, created_at').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
-    supabase.from('newpage_memory').select('id, note').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
+    // Newest first so the window is the latest notes, then put back in time order for the prompt.
+    supabase.from('newpage_memory').select('id, note').eq('member_id', memberId).order('created_at', { ascending: false }).limit(MEMORY_LIMIT),
     supabase.from('newpage_messages').select('role, content, created_at').eq('member_id', memberId).eq('coach', coach).order('id', { ascending: false }).limit(40),
     supabase.from('newpage_goals').select('id, title, target, done').eq('member_id', memberId).order('created_at', { ascending: true }).limit(50),
     supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100)
@@ -77,7 +78,7 @@ async function load(member, coach = 'career') {
   return {
     progress: progress.data || [], goals: goals.data || [], bookings: bookings.data || [],
     tasks: (tasks.data || []).map(t => ({ id: t.id, title: t.title, due: t.due, done: t.done, source: t.source, goalId: t.goal_id || null, start: t.block_start ? String(t.block_start).slice(0, 5) : null, mins: t.block_mins || null })), checkins: checkins.data || [],
-    memory: (memory.data || []).map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
+    memory: (memory.data || []).reverse().map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
     messages: (messages.data || []).map(m => ({ ...m, content: openText(vault, 'msg', m.content) })).reverse()
   }
 }
@@ -132,11 +133,18 @@ export default async function handler(req, res) {
   // month-by-month renewal. Sessions with a human coach are bought and booked under Tools.
   if (isTools(member)) {
     if (b.action === 'renew_checkout') return res.status(403).json({ error: 'Your membership renews by itself each month. Change your card or cancel under Me.', code: 'tools' })
-    const kind = b.action === 'coach' ? 'messages' : b.action === 'resume_tailor' ? 'tailored' : (b.action === 'cover_draft' || (b.action === 'doc_generate' && b.kind === 'cover')) ? 'covers' : null
+    // A cover letter counts once, when the finished letter is saved (doc_generate), not at the first draft.
+    const kind = b.action === 'coach' ? 'messages' : b.action === 'resume_tailor' ? 'tailored' : (b.action === 'doc_generate' && b.kind === 'cover') ? 'covers' : null
     if (kind) {
       const a = await usageAllowance(member, kind)
       if (!a.ok) return res.status(429).json({ error: a.why, code: 'usage_cap', used: a.used, cap: a.cap })
-      await usageSpend(member, kind)
+      // Spend only when a successful reply goes out, so a failed, filtered or rejected request costs nothing.
+      const sendJson = res.json.bind(res)
+      res.json = async body => {
+        res.json = sendJson
+        if (res.statusCode < 400 && body && !body.error && !body.crisis) await usageSpend(member, kind).catch(err => console.error('Usage spend failed:', err))
+        return sendJson(body)
+      }
     }
     if (b.action === 'billing_portal') {
       if (!member.stripe_customer_id) return res.status(400).json({ error: 'We can’t find your billing details. Reply to any email from us and we’ll sort it out.' })

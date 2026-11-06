@@ -111,6 +111,34 @@ class ResumeApi(unittest.TestCase):
         api._calls["member-1"].extend([time.time()] * api.LIMIT_PER_HOUR)
         self.assertEqual(self.call(action="start", materials=SOURCE)[0], 429)
 
+    def test_a_resume_is_counted_only_after_its_first_draft(self):
+        spent = []
+        real_spend = api.resume_spend
+        api.resume_spend = lambda member: spent.append(member)
+        try:
+            claude.ask_structured = lambda *a: (_ for _ in ()).throw(claude.ClaudeError("error", "503 overloaded"))
+            self.assertEqual(self.call(action="start", materials=SOURCE)[0], 502)
+            self.assertEqual(self.call(action="start", materials="too short")[0], 400)
+            self.assertEqual(spent, [], "a failed start must not spend a resume")
+            claude.ask_structured = fake_ask
+            self.assertEqual(self.call(action="start", materials=SOURCE)[0], 200)
+            self.assertEqual(spent, ["member-1"])
+        finally:
+            api.resume_spend = real_spend
+
+    def test_amendments_are_capped_per_resume(self):
+        from resume_agent import agent
+        code, out = self.call(action="start", materials=SOURCE)
+        self.assertEqual(code, 200)
+        session = out["session"]
+        for i in range(agent.MAX_REVISIONS):
+            code, out = self.call(action="reply", session=session, message="Please change the summary")
+            self.assertEqual(code, 200, i)
+            session = out["session"]
+        code, out = self.call(action="reply", session=session, message="One more change")
+        self.assertEqual(code, 429)
+        self.assertEqual(out["code"], "limit")
+
 
 if __name__ == "__main__":
     unittest.main()

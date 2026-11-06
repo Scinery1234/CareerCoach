@@ -158,7 +158,14 @@ def resume_session(resume, secret, materials="", job_description="", target_titl
     return _out(s, secret, _draft_messages(s, "draft"))
 
 
+# Each amendment is a full model draft, so one resume allows a fixed number of them.
+MAX_REVISIONS = 8
+
+
 def _revise(s, ask, amendments):
+    if s.get("revisions", 0) >= MAX_REVISIONS:
+        raise AgentError("limit", f"This resume has had {MAX_REVISIONS} rounds of changes, which is the most one resume allows. Approve it as it is, or start a new resume.")
+    s["revisions"] = s.get("revisions", 0) + 1
     s["state"] = State.DRAFTING.value
     if s.get("questions"):
         s["answers"] = (s.get("answers", "") + "\n" + amendments).strip()[:6000]

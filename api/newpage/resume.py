@@ -118,16 +118,18 @@ def handle(b):
             ok, why = resume_allowance(str(claims.get("sub")))
             if not ok:
                 return 429, {"error": why, "code": "usage_cap"}
+            out = agent.start(str(b.get("materials") or ""), secret(), job_description=str(b.get("job_description") or ""),
+                              target_title=str(b.get("target_title") or ""), additional=str(b.get("additional") or ""))
+            # Counted only once a draft exists; a model error or bad input costs nothing.
             resume_spend(str(claims.get("sub")))
-            return 200, agent.start(str(b.get("materials") or ""), secret(), job_description=str(b.get("job_description") or ""),
-                                    target_title=str(b.get("target_title") or ""), additional=str(b.get("additional") or ""))
+            return 200, out
         if action == "reply":
             return 200, agent.reply(str(b.get("session") or ""), str(b.get("message") or ""), secret())
         resume = b.get("resume") if isinstance(b.get("resume"), dict) else {}
         return 200, agent.resume_session(resume, secret(), materials=str(b.get("materials") or ""),
                                          job_description=str(b.get("job_description") or ""), target_title=str(b.get("target_title") or ""))
     except agent.AgentError as e:
-        return (401 if e.code == "session" else 400), {"error": str(e), "code": e.code}
+        return (401 if e.code == "session" else 429 if e.code == "limit" else 400), {"error": str(e), "code": e.code}
     except ClaudeError as e:
         print("resume agent:", e.code, str(e)[:500], file=sys.stderr)
         status, msg = CLAUDE_ERRORS.get(e.code, CLAUDE_ERRORS["error"])
