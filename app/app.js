@@ -421,7 +421,7 @@ function coachScreen() {
     S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'),
       h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),
     h('div', { class: 'msgs', id: 'msgs' },
-      me.messages.length ? me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.content))
+      me.messages.length ? me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.role === 'assistant' ? inline(m.content) : m.content))
         : h('div', { class: 'msg assistant' }, `Hi${me.member.name ? ' ' + me.member.name.split(' ')[0] : ''}. ${info.open}`),
       S.coachSending && h('div', { class: 'msg assistant typing', 'aria-label': 'Sky is typing' }, '···')),
     !me.messages.length && h('div', { class: 'starters' }, starters.map(s => h('button', { class: 'chip', type: 'button', onclick: () => send(s) }, s))),

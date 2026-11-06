@@ -246,10 +246,16 @@ export default async function handler(req, res) {
       if (!task) return res.status(400).json({ error: 'Unknown suggestion.' })
       if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Suggestions aren’t switched on yet.', code: 'coach_off' })
       if (!rateLimit(req, res, { max: 40, windowMs: 60 * 60 * 1000, key: `np-compass-${member.id}` })) return
+      const compass = cleanCompass(b.compass), data = b.data && typeof b.data === 'object' ? b.data : {}
+      const notReady = task.ready(compass, data)
+      if (notReady) return res.status(400).json({ error: notReady })
       try {
-        const compass = cleanCompass(b.compass)
-        const out = await askJson({ system: COMPASS_SYSTEM, prompt: task.prompt(compass, b.data || {}), schema: task.schema })
-        return res.json({ result: task.read(out) })
+        const run = async () => task.read(await askJson({ system: COMPASS_SYSTEM, prompt: task.prompt(compass, data), schema: task.schema }), compass, data)
+        let result = await run()
+        // Everything came back as a repeat (or short): ask once more before giving up.
+        if (task.empty?.(result)) result = await run()
+        if (task.empty?.(result)) return res.status(502).json({ error: 'Nothing new came back. Try again, or write your own.' })
+        return res.json({ result })
       } catch (err) {
         console.error('Compass suggestion failed:', err)
         return res.status(502).json({ error: aiMessage(err) })
