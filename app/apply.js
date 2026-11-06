@@ -44,7 +44,7 @@ export function appliedCard(ctx, job, state) {
     if (state.busy) return
     state.busy = true; state.err = ''; ctx.render()
     try {
-      const d = await ctx.call('/api/newpage/app', { action: 'apply_add', title: state.title ?? job.title, company: state.company ?? job.company, url: state.url ?? job.url, board: state.board || undefined, job: job.job, resume_doc_id: job.resume_doc_id, cover_doc_id: job.cover_doc_id, status })
+      const d = await ctx.call('/api/newpage/app', { action: 'apply_add', title: state.title ?? job.title, company: state.company ?? job.company, url: state.url ?? job.url, board: state.board || undefined, job: job.job, resume_doc_id: job.resume_doc_id, cover_doc_id: job.cover_doc_id, alert_id: job.alert_id, status })
       absorb(ctx, d); state.logged = true; state.duplicate = d.duplicate
     } catch (e) { state.err = e.message }
     state.busy = false; ctx.render()
@@ -62,6 +62,39 @@ export function appliedCard(ctx, job, state) {
       h('button', { class: 'btn btn-primary', type: 'button', disabled: state.busy, onclick: () => send('applied') }, state.busy ? 'Saving…' : 'I applied'),
       h('button', { class: 'btn btn-secondary', type: 'button', disabled: state.busy, onclick: () => send('saved') }, 'Not yet, save it'),
       h('button', { class: 'link-btn', type: 'button', onclick: () => { state.skipped = true; ctx.render() } }, 'Skip')))
+}
+
+// ── Early alerts, on Today ──
+const DISMISS = [['pay', 'Pay'], ['location', 'Location'], ['hours', 'Hours'], ['level', 'Level'], ['not_for_me', 'Not for me']]
+const agoText = iso => { if (!iso) return ''; const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : m < 2880 ? 'yesterday' : `${Math.round(m / 1440)} days ago` }
+
+// Hands an alert's ad details to the Resume writer's tailor step. The ad text itself is
+// not ours to copy (Adzuna gives a snippet), so the member pastes it from the open tab.
+export function tailorFrom(ctx, a) {
+  try { sessionStorage.setItem('np-tailor-handoff', JSON.stringify({ role: a.title, company: a.company, url: a.url, alert_id: a.id })) } catch { /* private mode */ }
+  ctx.call('/api/newpage/app', { action: 'alert_state', id: a.id, state: 'opened' }).then(d => absorb(ctx, d)).catch(() => {})
+  window.open(a.url, '_blank', 'noopener')
+  ctx.go('tools', 'resume')
+}
+
+export function alertsCard(ctx) {
+  const me = ctx.S.me, al = me.alerts
+  if (!al || !al.open) return null
+  const dismiss = async (a, reason) => { try { const d = await ctx.call('/api/newpage/app', { action: 'alert_state', id: a.id, state: 'dismissed', reason }); absorb(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
+  const open = a => { ctx.call('/api/newpage/app', { action: 'alert_state', id: a.id, state: 'opened' }).then(d => absorb(ctx, d)).catch(() => {}); window.open(a.url, '_blank', 'noopener') }
+  if (al.count) ctx.beacon('/api/newpage/app', { action: 'alerts_seen' })
+  return h('div', { class: 'card ap-alerts' },
+    h('div', { class: 'row review-head' }, h('span', { class: 'label' }, al.count ? `${al.count} new job${al.count === 1 ? '' : 's'} that look like a fit` : 'Jobs that looked like a fit'), h('span', { class: 'small muted' }, 'from the summary; the ad decides')),
+    h('ul', { class: 'ap-list' }, al.top.map(a => h('li', { class: 'ap-row ap-alert' + (a.state === 'new' ? ' ap-new' : '') },
+      h('div', { class: 'ap-main' },
+        h('div', {}, h('b', {}, a.title), a.company && h('span', { class: 'muted' }, ` · ${a.company}`)),
+        h('div', { class: 'small muted' }, [a.location, a.salary, a.posted_at && `posted ${agoText(a.posted_at)}`].filter(Boolean).join(' · ')),
+        a.fit?.verdict && h('p', { class: 'small ap-verdict' }, h('b', {}, a.words + '. '), a.fit.verdict),
+        h('div', { class: 'ap-status' },
+          h('button', { class: 'btn btn-primary small', type: 'button', onclick: () => tailorFrom(ctx, a) }, 'Tailor my resume'),
+          h('button', { class: 'link-btn blue small', type: 'button', onclick: () => open(a) }, 'Open the ad'),
+          h('select', { class: 'ap-dismiss', 'aria-label': 'Dismiss', onchange: e => { if (e.target.value) dismiss(a, e.target.value) } }, h('option', { value: '' }, 'Not this one…'), DISMISS.map(([k, n]) => h('option', { value: k }, n)))))))),
+    h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.go('tools', 'apply') }, 'Change what to look for'))
 }
 
 // ── Today ──
@@ -154,6 +187,28 @@ function skyCard(ctx) {
     h('label', { class: 'row ap-switch' }, h('input', { type: 'checkbox', ...(s.emails ? { checked: '' } : {}), onchange: e => set({ action: 'apply_settings_set', emails: e.target.checked }) }), h('span', { class: 'small' }, 'A short note from Sky on Sunday evenings about the week’s applications. Off unless you turn it on.')))
 }
 
+function searchCard(ctx) {
+  const s = ctx.S.me.applySettings || {}
+  const f = (L.search ||= { roles: (s.roles || []).join(', '), locations: (s.locations || []).join(', '), radiusKm: s.radiusKm || 25, salaryFloor: s.salaryFloor || '', hours: s.hours || 'any', fitFloor: s.fitFloor ?? 60 })
+  const save = async () => {
+    try { const d = await ctx.call('/api/newpage/app', { action: 'apply_settings_set', roles: f.roles, locations: f.locations, radiusKm: Number(f.radiusKm), salaryFloor: f.salaryFloor === '' ? 0 : Number(f.salaryFloor), hours: f.hours, fitFloor: Number(f.fitFloor) }); absorb(ctx, d); L.note = d.applySettings.roles.length ? 'Saved. New listings are checked every hour; the first ones show on Today.' : 'Saved. Add a role to start getting new listings.' } catch (e) { L.err = e.message }
+    ctx.render()
+  }
+  const emails = async on => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_settings_set', alertEmails: on }); absorb(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
+  return h('form', { class: 'card doc-form', onsubmit: e => { e.preventDefault(); save() } },
+    h('span', { class: 'label' }, 'New jobs, early'),
+    h('p', { class: 'small muted' }, 'Tell us what you’re looking for and new listings are checked every hour against your resume and what you’ve said matters. The good ones show on Today, within the hour they appear, so you can be one of the first to apply.'),
+    h('div', { class: 'ap-fields' },
+      h('label', { class: 'field' }, h('span', {}, 'Roles (up to 5, comma separated)'), h('input', { value: f.roles, placeholder: 'e.g. Aged care worker, Disability support worker', oninput: e => { f.roles = e.target.value } })),
+      h('label', { class: 'field' }, h('span', {}, 'Where (up to 3)'), h('input', { value: f.locations, placeholder: 'e.g. Geelong, Werribee', oninput: e => { f.locations = e.target.value } })),
+      h('label', { class: 'field' }, h('span', {}, 'Within (km)'), h('input', { type: 'number', min: 5, max: 200, value: f.radiusKm, oninput: e => { f.radiusKm = e.target.value } })),
+      h('label', { class: 'field' }, h('span', {}, 'Pay at least ($ a year, optional)'), h('input', { type: 'number', min: 0, step: 1000, value: f.salaryFloor, oninput: e => { f.salaryFloor = e.target.value } })),
+      h('label', { class: 'field' }, h('span', {}, 'Hours'), h('select', { onchange: e => { f.hours = e.target.value } }, [['any', 'Any'], ['full_time', 'Full time'], ['part_time', 'Part time'], ['casual', 'Casual']].map(([k, n]) => h('option', { value: k, ...(k === f.hours ? { selected: '' } : {}) }, n)))),
+      h('label', { class: 'field' }, h('span', {}, 'Only show fits above'), h('select', { onchange: e => { f.fitFloor = e.target.value } }, [[40, 'Show me more'], [60, 'A fair fit (default)'], [75, 'Only strong fits']].map(([k, n]) => h('option', { value: k, ...(Number(k) === Number(f.fitFloor) ? { selected: '' } : {}) }, n))))),
+    h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save')),
+    h('label', { class: 'row ap-switch' }, h('input', { type: 'checkbox', ...(s.alertEmails ? { checked: '' } : {}), onchange: e => emails(e.target.checked) }), h('span', { class: 'small' }, 'Email me when a strong fit appears (at most one email every six hours, never on the first check).')))
+}
+
 function targetCard(ctx) {
   const save = async v => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_settings_set', weeklyTarget: v }); absorb(ctx, d); L.target = d.applySettings?.weeklyTarget || ''; L.note = L.target ? `Target set: ${L.target} a week.` : 'No weekly target.' } catch (e) { L.err = e.message } ctx.render() }
   return h('div', { class: 'card' }, h('span', { class: 'label' }, 'A weekly rhythm, if you want one'),
@@ -178,6 +233,7 @@ export function applyScreen(ctx) {
       : !list.length ? h('div', { class: 'card' }, h('p', { class: 'small muted' }, 'Nothing logged yet. Tailor a resume or write a cover letter and you’ll be asked whether you applied.'),
         h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => ctx.go('tools', 'resume') }, 'Open the resume writer')))
       : groups.filter(([, g]) => g.length).map(([name, g]) => h('div', { class: 'ap-group' }, h('h3', { class: 'group' }, `${name} (${g.length})`), h('ul', { class: 'ap-list' }, g.map(a => row(ctx, a))))),
+    searchCard(ctx),
     targetCard(ctx),
     skyCard(ctx))
 }

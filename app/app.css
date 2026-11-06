@@ -408,3 +408,7 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
 .ap-offer { border-color: var(--ink); }
 .ap-switch { align-items: flex-start; gap: 10px; cursor: pointer; }
 .ap-switch input { margin-top: 4px; }
+.ap-alerts .ap-new { border-color: var(--ink); }
+.ap-verdict { margin: 4px 0 0; }
+.ap-dismiss { font: inherit; font-size: 14px; border: 1.5px solid #C9D3E3; border-radius: 10px; padding: 4px 8px; background: #fff; color: var(--ink); }
+.btn.small { min-height: 36px; padding: 6px 14px; font-size: 14px; }

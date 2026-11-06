@@ -3,7 +3,7 @@ import { h, todayStr } from './ui.js'
 import { plannerScreen } from './planner.js'
 import { compassScreen, compassStatus, COMPASS_STEPS } from './compass.js'
 import { docsScreen } from './docs.js'
-import { applyScreen, pipelineCard, offerCard } from './apply.js'
+import { applyScreen, pipelineCard, offerCard, alertsCard } from './apply.js'
 import { sessionScreen } from './session.js'
 import { sectionsScreen, sectionKinds } from './sections.js'
 import { openSky, skySeen } from './sky.js'
@@ -269,6 +269,7 @@ function todayScreen() {
     p.complete && h('div', { class: 'soft' }, h('b', {}, 'You’ve done your four weeks. '), 'Retake the check-in to see how far you’ve moved, and talk to Sky about what’s next.'),
     h('div', { class: 'today-grid' },
     gettingStarted(me),
+    alertsCard(ctx),
     offerCard(ctx),
     pipelineCard(me, go),
     h('div', { class: 'week-card' },
@@ -329,6 +330,7 @@ function toolsToday(me, first) {
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky'),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Open the Compass'))),
       gettingStarted(me),
+      alertsCard(ctx),
       offerCard(ctx),
       pipelineCard(me, go),
       u && h('div', { class: 'card' }, h('span', { class: 'label' }, 'This month'),

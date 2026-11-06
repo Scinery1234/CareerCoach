@@ -87,12 +87,21 @@ test('a patch only carries what was asked for', () => {
 })
 
 test('settings: the weekly target is a whole number from 1 to 50, or none', () => {
-  const base = { offer: null, emails: false }
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 3 }), { weeklyTarget: 3, ...base })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: '4' }), { weeklyTarget: 4, ...base })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 0 }), { weeklyTarget: null, ...base })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 500 }), { weeklyTarget: null, ...base })
-  assert.deepEqual(cleanApplySettings(null), { weeklyTarget: null, ...base })
+  assert.equal(cleanApplySettings({ weeklyTarget: 3 }).weeklyTarget, 3)
+  assert.equal(cleanApplySettings({ weeklyTarget: '4' }).weeklyTarget, 4)
+  assert.equal(cleanApplySettings({ weeklyTarget: 0 }).weeklyTarget, null)
+  assert.equal(cleanApplySettings({ weeklyTarget: 500 }).weeklyTarget, null)
+  const empty = cleanApplySettings(null)
+  assert.deepEqual(empty, { weeklyTarget: null, offer: null, emails: false, roles: [], locations: [], radiusKm: 25, salaryFloor: 0, hours: 'any', fitFloor: 60, alertEmails: false, lastPolledAt: null, firstPollDone: false, lastAlertEmailAt: null })
+  // Search preferences: a comma list or an array, deduplicated case-insensitively, capped, bad values replaced by defaults.
+  const s = cleanApplySettings({ roles: 'Cook, chef, COOK, , a, b, c, d', locations: ['Geelong', 'geelong', 'Lara'], radiusKm: 999, salaryFloor: -5, hours: 'nights', fitFloor: '75', alertEmails: 'yes' })
+  assert.deepEqual(s.roles, ['Cook', 'chef', 'a', 'b', 'c'])
+  assert.deepEqual(s.locations, ['Geelong', 'Lara'])
+  assert.equal(s.radiusKm, 25)
+  assert.equal(s.salaryFloor, 0)
+  assert.equal(s.hours, 'any')
+  assert.equal(s.fitFloor, 75, 'a whole number as a string is fine, forms send those')
+  assert.equal(s.alertEmails, false, 'only true switches it on')
   assert.deepEqual(cleanApplySettings({ offer: { answer: 'no', at: '2026-11-01', stage: 'ready', patterns: ['x'], count: 1 }, emails: true }).offer, { answer: 'no', at: '2026-11-01', stage: 'ready', patterns: ['x'], count: 1 })
   assert.equal(cleanApplySettings({ offer: { answer: 'maybe' } }).offer, null)
 })

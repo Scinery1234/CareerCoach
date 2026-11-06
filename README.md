@@ -11,7 +11,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `index.html` | The landing page the ads point at. `/join` pays, `/demo` is the no-sign-up demo. |
 | `app/` | The member app: Today, Coach (Sky), Tools, Me. Plain HTML, CSS and JS, no build step. |
 | `join/`, `demo/`, `memory/`, `admin/` | Paying, the demo, the memory page linked from retention emails, and the admin (members, demo feedback, the content editor, "Is everything working?"). `admin/bookings.html` manages the human coach's availability and bookings. |
-| `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`, `applycheck` (Sunday note about the week's applications, for members who turned it on). |
+| `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`, `applycheck` (Sunday note about the week's applications, for members who turned it on), `alerts` (hourly: new listings from Adzuna scored for fit, see below). |
 | `lib/newpage-apply.js`, `app/apply.js` | The application log: what a member applied for and what came back. Logged from the end of the tailor and cover letter flows or by hand under Tools, Applications; the week's count is on Today. Sky knows where the member is with applying (worked out in code, not guessed), offers help once at the right moment, respects a no, and has an Applying focus plus tools to log and update applications when the member says so. Plan for the rest of this work: `docs/APPLY_PLAN.md`. |
 | `api/newpage/resume.py`, `docx.py`, `api/_py/` | Python: the resume agent, the Word builders, usage limits. |
 | `api/bookings`, `api/availability.js`, `api/session-types.js`, `api/admin/*` | The booking engine for sessions with the human coach. |
@@ -36,6 +36,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `JWT_SECRET` | Long random string; signs member and admin sessions |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` | Admin sign-in. Hash with `npm run generate-hash -- 'your password'` |
 | `ANTHROPIC_API_KEY` | Sky and the writers |
+| `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | Early alerts: new job listings from Adzuna's Australian API, checked hourly for members who set roles under Tools, Applications. Without them the alerts cron does nothing. `ALERTS_MODEL_BUDGET` (default 25) caps fit-scoring model calls per run; `NEWPAGE_FIT_MODEL` picks the model (default: the coach model). |
 | `NEWPAGE_WRITER_MODEL`, `RESUME_MODEL` | Optional. `claude-sonnet-5-5` keeps the writers cheap; default is Opus |
 | `TRIAL_DAYS` | Free trial on the membership, card taken at checkout. Default 7; 0 switches it off and the pages say $25 a month |
 | `NEWPAGE_MEMORY_KEY` | 32 random bytes, base64. Encrypts Sky's memory. `openssl rand -base64 32` |

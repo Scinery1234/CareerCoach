@@ -28,7 +28,8 @@ import {
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
-import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS } from '../../lib/newpage-apply.js'
+import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS, DISMISS_REASONS } from '../../lib/newpage-apply.js'
+import { fitWords } from '../../lib/newpage-fit.js'
 import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
 
@@ -74,13 +75,13 @@ async function listApplications(member, vault) {
 
 // Where they are with applying and whether Sky should offer. `matches` (the match
 // tables of recent tailored resumes) is only to hand in the coach action.
-function applyState({ docs, applications, applySettings, matches = [] }) {
+function applyState({ docs, applications, applySettings, matches = [], dismissals = [] }) {
   const stage = applyStage({ docs, apps: applications })
-  const patterns = applyPatterns({ apps: applications, matches })
+  const patterns = applyPatterns({ apps: applications, matches, dismissals })
   return { stage, patterns, offer: applySettings.offer, emails: applySettings.emails, decision: offerDecision({ stage, patterns, offer: applySettings.offer }) }
 }
 function withMatches(data, matches) {
-  const patterns = applyPatterns({ apps: data.applications, matches })
+  const patterns = applyPatterns({ apps: data.applications, matches, dismissals: data.dismissals })
   return { ...data.apply, patterns, decision: offerDecision({ stage: data.apply.stage, patterns, offer: data.applySettings.offer }) }
 }
 async function patchApplySettings(member, patch) {
@@ -92,7 +93,7 @@ async function patchApplySettings(member, patch) {
 async function load(member, coach = 'career') {
   const memberId = member.id
   const vault = await openVault(member)
-  const [progress, tasks, checkins, memory, messages, goals, bookings, apps, applyRaw, docs] = await Promise.all([
+  const [progress, tasks, checkins, memory, messages, goals, bookings, apps, applyRaw, docs, alerts, dismissed] = await Promise.all([
     supabase.from('newpage_progress').select('week, step').eq('member_id', memberId),
     supabase.from('newpage_tasks').select('id, title, due, done, source, created_at, block_start, block_mins, goal_id').eq('member_id', memberId).order('created_at', { ascending: true }).limit(200),
     supabase.from('newpage_checkins').select('clarity, capacity, quadrant, created_at').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
@@ -102,14 +103,20 @@ async function load(member, coach = 'career') {
     supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100),
     supabase.from('newpage_applications').select('id, title, company, board, url, status, applied_at, status_at, fit, source, resume_doc_id, cover_doc_id, created_at').eq('member_id', memberId).order('created_at', { ascending: false }).limit(200),
     getTool(member, 'apply'),
-    supabase.from('newpage_docs').select('kind, created_at').eq('member_id', memberId).in('kind', ['resume', 'cover']).order('created_at', { ascending: false }).limit(30)
+    supabase.from('newpage_docs').select('kind, created_at').eq('member_id', memberId).in('kind', ['resume', 'cover']).order('created_at', { ascending: false }).limit(30),
+    supabase.from('newpage_alerts').select('id, title, company, location, salary, url, board, posted_at, fit, state, created_at').eq('member_id', memberId).in('state', ['new', 'seen', 'opened']).order('created_at', { ascending: false }).limit(60),
+    supabase.from('newpage_alerts').select('dismiss_reason, created_at').eq('member_id', memberId).eq('state', 'dismissed').gte('created_at', new Date(Date.now() - 14 * 86400000).toISOString()).limit(200)
   ])
+  const alertRows = (alerts.data || []).sort((a, b) => (b.fit?.score || 0) - (a.fit?.score || 0) || String(b.created_at).localeCompare(String(a.created_at)))
+  const dismissals = (dismissed.data || []).map(d => ({ reason: d.dismiss_reason, created_at: d.created_at }))
   const applySettings = cleanApplySettings(applyRaw)
   const applications = (apps.data || []).map(a => openApplication(vault, a))
   return {
     progress: progress.data || [], goals: goals.data || [], bookings: bookings.data || [],
     applications, applySettings, pipeline: pipelineSummary(applications, { target: applySettings.weeklyTarget }),
-    apply: applyState({ docs: docs.data || [], applications, applySettings }),
+    apply: applyState({ docs: docs.data || [], applications, applySettings, dismissals }),
+    alerts: { count: alertRows.filter(a => a.state === 'new').length, open: alertRows.length, top: alertRows.slice(0, 5).map(a => ({ ...a, words: fitWords(a.fit) })) },
+    dismissals,
     tasks: (tasks.data || []).map(t => ({ id: t.id, title: t.title, due: t.due, done: t.done, source: t.source, goalId: t.goal_id || null, start: t.block_start ? String(t.block_start).slice(0, 5) : null, mins: t.block_mins || null })), checkins: checkins.data || [],
     memory: (memory.data || []).map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
     messages: (messages.data || []).map(m => ({ ...m, content: openText(vault, 'msg', m.content) })).reverse()
@@ -424,6 +431,7 @@ export default async function handler(req, res) {
       if (dup) return res.json({ application: dup, duplicate: true, ...(await me(member, coachOf(b.coach))) })
       const { data: saved, error } = await supabase.from('newpage_applications').insert({ member_id: member.id, ...sealApplication(vault, row), status_at: new Date().toISOString() }).select(APP_COLS).single()
       if (error) return res.status(500).json({ error: 'That didn’t save. Please try again.' })
+      if (ID_RE.test(String(b.alert_id || ''))) await supabase.from('newpage_alerts').update({ state: 'applied' }).eq('id', b.alert_id).eq('member_id', member.id)
       return res.json({ application: openApplication(vault, saved), duplicate: false, ...(await me(member, coachOf(b.coach))) })
     }
     case 'apply_update': {
@@ -444,8 +452,28 @@ export default async function handler(req, res) {
       const patch = {}
       if (b.weeklyTarget !== undefined) patch.weeklyTarget = b.weeklyTarget
       if (b.emails !== undefined) patch.emails = b.emails === true
+      for (const k of ['roles', 'locations', 'radiusKm', 'salaryFloor', 'hours', 'fitFloor']) if (b[k] !== undefined) patch[k] = b[k]
+      if (b.alertEmails !== undefined) patch.alertEmails = b.alertEmails === true
       await patchApplySettings(member, patch)
       return res.json(await me(member, coachOf(b.coach)))
+    }
+    case 'alert_list': {
+      const { data } = await supabase.from('newpage_alerts').select('id, title, company, location, salary, url, board, posted_at, fit, state, dismiss_reason, created_at').eq('member_id', member.id).neq('dismiss_reason', 'stale').neq('dismiss_reason', 'filter').order('created_at', { ascending: false }).limit(100)
+      return res.json({ alerts: (data || []).map(a => ({ ...a, words: fitWords(a.fit) })) })
+    }
+    case 'alert_state': {
+      // seen (the card was shown), opened (they looked at the ad), dismissed with a reason.
+      if (!ID_RE.test(String(b.id))) return res.status(400).json({ error: 'Unknown alert.' })
+      const state = ['seen', 'opened', 'dismissed'].includes(b.state) ? b.state : null
+      if (!state) return res.status(400).json({ error: 'Unknown state.' })
+      const patch = { state }
+      if (state === 'dismissed') patch.dismiss_reason = DISMISS_REASONS.includes(b.reason) && !['fit', 'stale', 'filter'].includes(b.reason) ? b.reason : 'not_for_me'
+      await supabase.from('newpage_alerts').update(patch).eq('id', b.id).eq('member_id', member.id)
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+    case 'alerts_seen': {
+      await supabase.from('newpage_alerts').update({ state: 'seen' }).eq('member_id', member.id).eq('state', 'new')
+      return res.json({ ok: true })
     }
     case 'apply_offer_set': {
       // The Today card's "Not now" (later) or "Talk to Sky" (yes), or a change in the Applications tool.

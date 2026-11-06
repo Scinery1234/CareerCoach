@@ -1,0 +1,52 @@
+{
+  "count": 4,
+  "mean": 62000,
+  "results": [
+    {
+      "id": "5012345678",
+      "title": "Aged Care <strong>Worker</strong> - Residential",
+      "company": { "display_name": "Harbour Aged Care" },
+      "location": { "display_name": "Geelong, VIC", "area": ["Australia", "Victoria", "Geelong"] },
+      "salary_min": 58000, "salary_max": 64000, "salary_is_predicted": "0",
+      "redirect_url": "https://www.adzuna.com.au/land/ad/5012345678?se=abc&utm_medium=api&utm_source=1234&v=1",
+      "created": "__NOW_MINUS_40M__",
+      "description": "Harbour Aged Care is seeking a caring Personal Care Worker for morning shifts in our Geelong home. Certificate III in Individual Support required. Supportive team, permanent part time.",
+      "category": { "label": "Healthcare & Nursing Jobs", "tag": "healthcare-nursing-jobs" },
+      "contract_time": "part_time", "contract_type": "permanent"
+    },
+    {
+      "id": "5012345679",
+      "title": "Disability Support Worker - Casual",
+      "company": { "display_name": "Bay Community Services" },
+      "location": { "display_name": "Lara, Geelong" },
+      "salary_min": 70000, "salary_max": 70000, "salary_is_predicted": "1",
+      "redirect_url": "https://www.seek.com.au/job/81234567?type=standout",
+      "created": "__NOW_MINUS_3H__",
+      "description": "Join our team supporting NDIS participants in the community. Flexible casual hours, weekends available. Driver licence and own car essential.",
+      "category": { "label": "Social work Jobs" }, "contract_time": "", "contract_type": "contract"
+    },
+    {
+      "id": "5012345680",
+      "title": "Registered Nurse - ICU",
+      "company": { "display_name": "Regional Health" },
+      "location": { "display_name": "Geelong, VIC" },
+      "salary_min": 95000, "salary_max": 110000, "salary_is_predicted": "0",
+      "redirect_url": "https://careers.regionalhealth.org.au/job/rn-icu-4421",
+      "created": "__NOW_MINUS_5H__",
+      "description": "Experienced ICU nurse for a busy regional unit. AHPRA registration essential.",
+      "category": { "label": "Healthcare & Nursing Jobs" }, "contract_time": "full_time", "contract_type": "permanent"
+    },
+    {
+      "id": "5012345681",
+      "title": "Aged Care Worker",
+      "company": { "display_name": "Old Listing Co" },
+      "location": { "display_name": "Geelong, VIC" },
+      "redirect_url": "https://www.adzuna.com.au/land/ad/5012345681?se=zzz",
+      "created": "__NOW_MINUS_3D__",
+      "description": "Posted days ago.",
+      "category": { "label": "Healthcare & Nursing Jobs" }
+    },
+    { "id": "", "title": "Broken row with no id", "redirect_url": "https://x.com/a" },
+    { "id": "5012345678", "title": "Duplicate id of the first row", "redirect_url": "https://www.adzuna.com.au/land/ad/5012345678", "created": "__NOW_MINUS_40M__" }
+  ]
+}

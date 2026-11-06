@@ -435,3 +435,26 @@ CREATE TABLE IF NOT EXISTS newpage_applications (
 );
 CREATE INDEX IF NOT EXISTS newpage_applications_member_idx ON newpage_applications (member_id, applied_at DESC);
 ALTER TABLE newpage_applications ENABLE ROW LEVEL SECURITY;
+
+-- ── Early alerts ──
+-- New listings that fit, found through Adzuna's licensed API or (later) captured from
+-- the member's own browser. One row per member per listing. title, company, location,
+-- snippet and url stay plain: they are the job board's public text, not the member's.
+CREATE TABLE IF NOT EXISTS newpage_alerts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  member_id uuid REFERENCES newpage_members(id) ON DELETE CASCADE,
+  external_id text NOT NULL,
+  title text, company text, location text, salary text,
+  url text NOT NULL,
+  board text,
+  posted_at timestamptz,
+  snippet text,
+  fit jsonb,
+  state text NOT NULL DEFAULT 'new' CHECK (state IN ('new','seen','opened','dismissed','applied')),
+  dismiss_reason text,
+  source text DEFAULT 'adzuna' CHECK (source IN ('adzuna','capture')),
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (member_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS newpage_alerts_member_idx ON newpage_alerts (member_id, state, created_at DESC);
+ALTER TABLE newpage_alerts ENABLE ROW LEVEL SECURITY;

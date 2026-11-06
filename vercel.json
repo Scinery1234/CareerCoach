@@ -20,6 +20,10 @@
     {
       "path": "/api/newpage/applycheck",
       "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/newpage/alerts",
+      "schedule": "20 * * * *"
     }
   ],
   "functions": {
@@ -35,6 +39,9 @@
       "maxDuration": 60
     },
     "api/newpage/applycheck.js": {
+      "maxDuration": 300
+    },
+    "api/newpage/alerts.js": {
       "maxDuration": 300
     }
   },

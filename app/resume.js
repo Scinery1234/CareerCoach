@@ -40,6 +40,10 @@ async function load(ctx) {
     L.text = p.data.text || ''
     L.docs = d.docs
   } catch (e) { L.text = ''; L.docs = []; L.err = e.message }
+  // From an alert on Today: the role and organisation are known; the member pastes the ad from the tab that opened.
+  let hand = null
+  try { hand = JSON.parse(sessionStorage.getItem('np-tailor-handoff') || 'null'); sessionStorage.removeItem('np-tailor-handoff') } catch { /* private mode */ }
+  if (hand && bases().length) { L.mode = 'tailor'; L.tail = null; L.tailRole = hand.role || ''; L.tailCo = hand.company || ''; L.tailJob = ''; L.handAlert = hand.alert_id || ''; L.handUrl = hand.url || ''; L.baseId = L.baseId || bases()[0].id; L.note = 'The ad opened in a new tab. Copy the whole ad and paste it below.' }
   if (!L.mode) L.mode = bases().length ? 'tailor' : 'new'
   if (!L.baseId && bases().length) L.baseId = bases()[0].id
   L.loading = false
@@ -218,7 +222,7 @@ function tailorView(ctx, doc) {
       h('button', { class: 'btn btn-primary', type: 'button', disabled: building, onclick: () => download(ctx, doc) }, building ? 'Building the Word file…' : f ? 'Download Word file' : 'Download Word file'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => toCover(ctx, doc) }, 'Write the cover letter for this job')),
     L.err && h('p', { class: 'error', role: 'alert' }, L.err),
-    appliedCard(ctx, { title: t.role || doc.content.target_title || '', company: t.company || '', url: '', job: doc.content.job_description || '', resume_doc_id: doc.id }, (L.applied[doc.id] ||= {})),
+    appliedCard(ctx, { title: t.role || doc.content.target_title || '', company: t.company || '', url: L.handUrl || '', job: doc.content.job_description || '', resume_doc_id: doc.id, alert_id: L.handAlert || undefined }, (L.applied[doc.id] ||= {})),
 
     h('div', { class: 'tl-block' }, h('b', {}, 'What changed'),
       changes.length === 0 ? h('p', { class: 'small muted' }, 'Only small wording changes.')
@@ -320,6 +324,7 @@ function tailorForm(ctx) {
     h('div', { class: 'two' },
       h('div', { class: 'field' }, h('label', { for: 'tl-role' }, 'Role'), h('input', { id: 'tl-role', type: 'text', maxlength: '120', placeholder: 'e.g. Operations Coordinator', value: L.tailRole, oninput: e => { L.tailRole = e.target.value } })),
       h('div', { class: 'field' }, h('label', { for: 'tl-co' }, 'Organisation'), h('input', { id: 'tl-co', type: 'text', maxlength: '120', value: L.tailCo, oninput: e => { L.tailCo = e.target.value } }))),
+    L.note && h('p', { class: 'small', role: 'status' }, L.note),
     L.err && h('p', { class: 'error', role: 'alert' }, L.err),
     h('button', { class: 'btn btn-primary', type: 'submit', disabled: !!L.busy || !!L.uploading }, L.busy || 'Tailor my resume'),
     h('p', { class: 'small muted' }, 'Your summary is rewritten for this role, the most relevant work leads, and the ad’s words are used where you have the thing. Employers, titles, dates and figures stay exactly as they are. Nothing is added that you haven’t done. You’ll see every change, and how you match the ad.'))
