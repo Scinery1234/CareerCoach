@@ -43,11 +43,11 @@ const cleanDate = v => (typeof v === 'string' && DATE_RE.test(v) ? v : null)
 const cleanTime = v => (typeof v === 'string' && TIME_RE.test(v) ? v : null)
 const cleanMins = v => (Number.isInteger(Number(v)) && Number(v) >= 5 && Number(v) <= 600 ? Number(v) : null)
 
-// A vault to write with. If encryption is switched on but this member's key can't be
-// opened, refuse rather than store anything unencrypted.
+// A vault to write with. If there is no usable key (encryption not set up, or this
+// member's key can't be opened), refuse rather than store anything unencrypted.
 async function writeVault(member) {
-  const v = await openVault(member, { create: true })
-  if (cryptoReady() && !v) throw Object.assign(new Error('Private storage isn’t available right now. Please try again later.'), { status: 503 })
+  const v = cryptoReady() ? await openVault(member, { create: true }) : null
+  if (!v) throw Object.assign(new Error('Private storage isn’t available right now. Please try again later.'), { status: 503 })
   return v
 }
 // The Compass is program work and stays as it is. The resume and the "about you"

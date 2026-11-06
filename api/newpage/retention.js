@@ -5,6 +5,7 @@ import { signMemory } from '../../lib/newpage-auth.js'
 import { retentionStep, trashOn, RETENTION } from '../../lib/newpage-retention.js'
 import { eraseMemory, restoreMemoryAccess } from '../../lib/newpage-memory-store.js'
 import { sweepDemos } from '../../lib/newpage-demo.js'
+import { cronAuthorised } from '../../lib/security.js'
 
 const BASE = () => process.env.NEXT_PUBLIC_URL || 'https://aicareercoach.net'
 
@@ -12,7 +13,7 @@ const BASE = () => process.env.NEXT_PUBLIC_URL || 'https://aicareercoach.net'
 // reminders at day 7 and 14, the Trash at day 30, and permanent deletion 12 months later.
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' })
+  if (!cronAuthorised(req)) return res.status(401).json({ error: 'Unauthorized' })
 
   const { data: members, error } = await supabase.from('newpage_members')
     .select('id, email, name, status, access_until, access_ended_at, memory_state, memory_trashed_at, memory_reminder').neq('memory_state', 'purged').neq('source', 'demo')

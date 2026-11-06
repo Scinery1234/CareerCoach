@@ -4,6 +4,7 @@ import { signOptOut } from '../../lib/newpage-auth.js'
 import { sessionState } from '../../lib/newpage-members.js'
 import { refreshContent } from '../../lib/newpage-content.js'
 import { dueProgramEmail, buildProgramEmail } from '../../lib/newpage-program-mail.js'
+import { cronAuthorised } from '../../lib/security.js'
 
 const BASE = () => process.env.NEXT_PUBLIC_URL || 'https://aicareercoach.net'
 
@@ -12,7 +13,7 @@ const BASE = () => process.env.NEXT_PUBLIC_URL || 'https://aicareercoach.net'
 // "gone quiet" note. At most one per member per run, and each is sent once.
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' })
+  if (!cronAuthorised(req)) return res.status(401).json({ error: 'Unauthorized' })
   await refreshContent()
 
   const { data: members, error } = await supabase.from('newpage_members')

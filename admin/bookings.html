@@ -2032,13 +2032,11 @@ async function submitBookForClient() {
   btn.disabled = true; btn.textContent = 'Booking…'
 
   try {
-    const res = await fetch('/api/bookings/schedule', {
+    const data = await apiFetch('/api/bookings/schedule', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientName: name, clientEmail: email, sessionTypeId, sessionName, durationMins, date, time, notes })
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Booking failed')
+      body: { clientName: name, clientEmail: email, sessionTypeId, sessionName, durationMins, date, time, notes }
+    }).catch(e => { throw new Error(e?.error || 'Booking failed') })
+    if (!data) throw new Error('Please sign in again')
     document.getElementById('bfc-step1').style.display = 'none'
     document.getElementById('bfc-success').style.display = 'block'
     loadBookings()

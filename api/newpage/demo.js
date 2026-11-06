@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase.js'
-import { rateLimit, isBot } from '../../lib/security.js'
+import { rateLimit, isBot, cronAuthorised } from '../../lib/security.js'
 import { requireAdmin } from '../../lib/auth.js'
 import { readToken } from '../../lib/newpage-auth.js'
 import { createDemoMember, DEMO, sweepDemos } from '../../lib/newpage-demo.js'
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
   }
 
   if (b.action === 'sweep') {
-    if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' })
+    if (!cronAuthorised(req)) return res.status(401).json({ error: 'Unauthorized' })
     return res.json({ ok: true, removed: await sweepDemos() })
   }
   res.status(400).json({ error: 'Unknown action.' })
