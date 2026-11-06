@@ -30,7 +30,7 @@ import {
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
 import { cleanApplication, cleanApplicationPatch, cleanApplySettings, pipelineSummary, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS, DISMISS_REASONS } from '../../lib/newpage-apply.js'
 import { fitWords } from '../../lib/newpage-fit.js'
-import { APP_COLS, sealApplication, openApplication, listApplications, addApplication, patchApplySettings as storePatchApplySettings } from '../../lib/newpage-apply-store.js'
+import { writeVault, APP_COLS, sealApplication, openApplication, listApplications, addApplication, patchApplySettings as storePatchApplySettings } from '../../lib/newpage-apply-store.js'
 import { createHash, randomBytes } from 'node:crypto'
 import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
@@ -47,13 +47,6 @@ const cleanDate = v => (typeof v === 'string' && DATE_RE.test(v) ? v : null)
 const cleanTime = v => (typeof v === 'string' && TIME_RE.test(v) ? v : null)
 const cleanMins = v => (Number.isInteger(Number(v)) && Number(v) >= 5 && Number(v) <= 600 ? Number(v) : null)
 
-// A vault to write with. If encryption is switched on but this member's key can't be
-// opened, refuse rather than store anything unencrypted.
-async function writeVault(member) {
-  const v = await openVault(member, { create: true })
-  if (cryptoReady() && !v) throw Object.assign(new Error('Private storage isn’t available right now. Please try again later.'), { status: 503 })
-  return v
-}
 // The Compass is program work and stays as it is. The resume and the "about you"
 // answers are part of Sky's memory, so they are encrypted with the member's key.
 const PRIVATE_TOOLS = ['profile', 'about', 'steer', 'apply']

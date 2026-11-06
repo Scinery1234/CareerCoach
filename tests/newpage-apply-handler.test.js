@@ -220,3 +220,19 @@ test('search preferences save and merge; alerts are listed, opened, dismissed an
   r = await act({ action: 'alerts_seen' })
   assert.equal(db.rows('newpage_alerts').filter(a => a.member_id === ME.id && a.state === 'new').length, 0)
 })
+
+// ── Review fixes ──
+test('a job that was saved and is then applied for becomes the application, not a duplicate', async () => {
+  let r = await act({ action: 'apply_add', title: 'Night Fill', company: 'Grocer', status: 'saved' })
+  assert.equal(r.body.application.status, 'saved')
+  assert.equal(r.body.pipeline.byStatus.saved, 1)
+  const before = r.body.pipeline.thisWeek
+  r = await act({ action: 'apply_add', title: 'Night Fill', company: 'Grocer', url: 'https://www.seek.com.au/job/4242', resume_doc_id: TAILORED.id })
+  assert.equal(r.body.duplicate, false)
+  assert.equal(r.body.updated, true)
+  assert.equal(r.body.application.status, 'applied')
+  assert.equal(r.body.pipeline.thisWeek, before + 1, 'it counts as sent this week')
+  assert.equal(db.rows('newpage_applications').filter(a => a.member_id === ME.id && a.resume_doc_id === TAILORED.id).length >= 1, true)
+  r = await act({ action: 'apply_add', title: 'Night Fill', company: 'Grocer' })
+  assert.equal(r.body.duplicate, true, 'a second apply for the same job is still a duplicate')
+})

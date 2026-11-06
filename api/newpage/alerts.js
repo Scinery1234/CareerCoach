@@ -38,6 +38,8 @@ export async function runAlerts({ now = new Date(), fetchFn = fetch, ask = askJs
   const out = { members: 0, searched: 0, scored: 0, alerts: 0, emailed: 0, skipped: 0, failed: 0, stopped: '' }
   // Old alerts go, whatever state they are in.
   await supabase.from('newpage_alerts').delete().lt('created_at', new Date(now - KEEP_DAYS * DAY).toISOString())
+  // The browser helper's hourly counters (api/newpage/extension.js) are only needed for the current hour.
+  await supabase.from('newpage_usage').delete().eq('kind', 'ext').lt('month', 'h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13))
 
   const { data: rows, error } = await supabase.from('newpage_tools').select('member_id, data').eq('tool', 'apply').limit(5000)
   if (error) throw error

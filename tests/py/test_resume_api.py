@@ -49,6 +49,14 @@ class ResumeApi(unittest.TestCase):
         self.assertEqual(api.handle({"action": "start", "token": "nope"})[0], 401)
         self.assertEqual(api.handle({"action": "start", "token": token(typ="magic")})[0], 401)
 
+    def test_browser_helper_token_can_only_build(self):
+        """An 'ext' token (the browser helper) builds Word files and nothing else."""
+        self.assertEqual(api.handle({"action": "start", "token": token(typ="ext"), "materials": SOURCE})[0], 403)
+        self.assertEqual(api.handle({"action": "open", "token": token(typ="ext"), "resume": APPROVED})[0], 403)
+        code, out = api.handle({"action": "build", "token": token(typ="ext"), "resume": copy.deepcopy(APPROVED), "target_title": "Operations Manager"})
+        self.assertEqual(code, 200, out.get("message"))
+        self.assertTrue(out["ok"])
+
     def test_four_phases_with_content_approval_gate(self):
         code, out = self.call(action="start", materials=SOURCE, job_description="Operations Manager", target_title="Operations Manager")
         self.assertEqual(code, 200)

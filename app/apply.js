@@ -35,7 +35,7 @@ async function setStatus(ctx, app, status) {
 export function appliedCard(ctx, job, state) {
   if (state.logged) {
     return h('div', { class: 'card ap-card ap-done' }, h('span', { class: 'label' }, 'Logged'),
-      h('p', { class: 'small' }, state.duplicate ? 'You’d already logged this one. ' : 'It’s in your applications now. ', 'Update it when you hear back, and Sky can see it if you want to talk it through.'),
+      h('p', { class: 'small' }, state.duplicate ? 'You’d already logged this one. ' : state.updated ? 'The saved entry is now marked as applied. ' : 'It’s in your applications now. ', 'Update it when you hear back, and Sky can see it if you want to talk it through.'),
       h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.go('tools', 'apply') }, 'See your applications'))
   }
   if (state.skipped) return null
@@ -44,8 +44,8 @@ export function appliedCard(ctx, job, state) {
     if (state.busy) return
     state.busy = true; state.err = ''; ctx.render()
     try {
-      const d = await ctx.call('/api/newpage/app', { action: 'apply_add', title: state.title ?? job.title, company: state.company ?? job.company, url: state.url ?? job.url, board: state.board || undefined, job: job.job, resume_doc_id: job.resume_doc_id, cover_doc_id: job.cover_doc_id, alert_id: job.alert_id, status })
-      absorb(ctx, d); state.logged = true; state.duplicate = d.duplicate
+      const d = await ctx.call('/api/newpage/app', { action: 'apply_add', title: state.title ?? job.title, company: state.company ?? job.company, url: state.url ?? job.url, board: state.board || board, job: job.job, resume_doc_id: job.resume_doc_id, cover_doc_id: job.cover_doc_id, alert_id: job.alert_id, status })
+      absorb(ctx, d); state.logged = true; state.duplicate = d.duplicate; state.updated = d.updated
     } catch (e) { state.err = e.message }
     state.busy = false; ctx.render()
   }
@@ -82,7 +82,8 @@ export function alertsCard(ctx) {
   if (!al || !al.open) return null
   const dismiss = async (a, reason) => { try { const d = await ctx.call('/api/newpage/app', { action: 'alert_state', id: a.id, state: 'dismissed', reason }); absorb(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
   const open = a => { ctx.call('/api/newpage/app', { action: 'alert_state', id: a.id, state: 'opened' }).then(d => absorb(ctx, d)).catch(() => {}); window.open(a.url, '_blank', 'noopener') }
-  if (al.count) ctx.beacon('/api/newpage/app', { action: 'alerts_seen' })
+  const shown = al.top.map(a => a.id).join(',')
+  if (al.count && L.seenFor !== shown) { L.seenFor = shown; ctx.beacon('/api/newpage/app', { action: 'alerts_seen' }) } // once per set of alerts shown, not per render
   return h('div', { class: 'card ap-alerts' },
     h('div', { class: 'row review-head' }, h('span', { class: 'label' }, al.count ? `${al.count} new job${al.count === 1 ? '' : 's'} that look like a fit` : 'Jobs that looked like a fit'), h('span', { class: 'small muted' }, 'from the summary; the ad decides')),
     h('ul', { class: 'ap-list' }, al.top.map(a => h('li', { class: 'ap-row ap-alert' + (a.state === 'new' ? ' ap-new' : '') },
@@ -120,7 +121,7 @@ export function pipelineCard(me, go) {
 export function offerCard(ctx) {
   const me = ctx.S.me, a = me.apply
   if (!a || a.decision !== 'offer' || a.offer) return null
-  const answer = async ans => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_offer_set', answer: ans }); absorbAll(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
+  const answer = async ans => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_offer_set', answer: ans }); absorb(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
   return h('div', { class: 'card ap-offer' },
     h('span', { class: 'label' }, 'Sky can help with applying'),
     h('p', { class: 'small' }, 'Track what you send, see what comes back, and talk through what gets in the way. Only if you want it.'),
@@ -128,7 +129,6 @@ export function offerCard(ctx) {
       h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => { await answer('yes'); ctx.askCoach('applying', 'I’d like help with the applying side. ') } }, 'Talk to Sky'),
       h('button', { class: 'link-btn', type: 'button', onclick: () => answer('later') }, 'Not now')))
 }
-function absorbAll(ctx, d) { if (d && d.me !== undefined) return; if (d && d.pipeline !== undefined) { ctx.S.me.pipeline = d.pipeline; ctx.S.me.applySettings = d.applySettings; ctx.S.me.apply = d.apply } }
 
 // ── The tool ──
 function row(ctx, a) {

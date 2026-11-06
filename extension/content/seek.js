@@ -49,13 +49,14 @@
     chrome.runtime.sendMessage({ type: 'page', page }).catch(() => {})
   }
 
-  // Seek is a single-page app: the URL and the form change without a load.
+  // Seek is a single-page app: the URL and the form change without a load. A content
+  // script cannot see the page's pushState (isolated world), but every step change
+  // redraws the DOM, so the observer is what follows Quick Apply; report() reads the
+  // URL fresh each time.
   let t
   const schedule = () => { clearTimeout(t); t = setTimeout(report, 400) }
   new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true })
   addEventListener('popstate', schedule)
-  const push = history.pushState.bind(history); history.pushState = (...a) => { push(...a); schedule() }
-  const rep = history.replaceState.bind(history); history.replaceState = (...a) => { rep(...a); schedule() }
   report()
 
   // Requests from the side panel.

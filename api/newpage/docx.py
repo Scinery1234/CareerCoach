@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import doc_builder as rb  # noqa: E402  (copied unchanged from Resume-Generator)
 import cover_builder as cb  # noqa: E402
-from np_auth import verify_session  # noqa: E402,F401  (re-exported for tests)
+from np_auth import session_claims, verify_session  # noqa: E402,F401  (re-exported for tests)
 from resume_agent.extract import extract_text  # noqa: E402,F401
 
 MAX_BODY = 4_000_000
@@ -44,10 +44,14 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             return respond(self, 400, {"error": "Bad request."})
 
-        if not verify_session(str(b.get("token") or "")):
+        claims = session_claims(str(b.get("token") or ""))
+        if not claims:
             return respond(self, 401, {"error": "Please sign in again.", "code": "auth"})
 
         action = b.get("action")
+        # The browser helper's token may only build a cover letter file.
+        if claims.get("typ") == "ext" and action != "cover":
+            return respond(self, 403, {"error": "The browser helper can only build documents.", "code": "ext_scope"})
         template = b.get("template") if b.get("template") in TEMPLATE_IDS else "modern"
         try:
             if action == "templates":

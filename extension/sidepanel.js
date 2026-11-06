@@ -95,11 +95,12 @@ function statusCard() {
   const step = S.page?.step
   const msg = { job: 'Press Apply on the page when you are ready; the steps appear here.', resume: 'Choose your resume above, then continue on the page.', cover: 'Attach or paste the letter above, then continue on the page.', questions: 'Fill, then read every answer on the page before you continue.', form: 'Fill, read every answer on the page, then continue there. The helper never advances a step on Indeed.', review: 'Everything is filled. Check it on the page and press Submit there.', done: 'Sent. Logged for you below.' }[step]
   const logIt = () => act('log', async () => { const j = S.page.job; S.logged = await bg({ type: 'log', application: { title: j.title, company: j.company, url: j.url, board: j.board, resume_doc_id: chosen('resume')?.id, cover_doc_id: chosen('cover')?.id } }) })
-  if (step === 'done' && !S.logged && !S.busy && S.page?.job?.title) logIt()
+  // Once per job: a failed log shows the error and the button, never a retry loop.
+  if (step === 'done' && !S.logged && !S.busy && S.page?.job?.title && S.logTried !== S.fitFor) { S.logTried = S.fitFor; logIt() }
   return h('div', { class: 'card status' },
     msg && h('p', { class: 'small' }, msg),
     S.logged && h('p', { class: 'small ok' }, S.logged.duplicate ? 'Already in your applications.' : `Logged: ${S.logged.application.title}. Sky can see it if you want to talk it through.`),
-    step !== 'done' && S.page?.job?.title && h('button', { class: 'link small', disabled: !!S.busy, onclick: logIt }, 'I applied another way, log it'),
+    !S.logged && S.page?.job?.title && !S.busy && h('button', { class: 'link small', onclick: logIt }, step === 'done' ? 'Log it again' : 'I applied another way, log it'),
     S.note && h('p', { class: 'small ok' }, S.note),
     S.err && h('p', { class: 'small err' }, S.err))
 }

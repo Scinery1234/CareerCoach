@@ -79,6 +79,9 @@ def handle(b):
     if not claims:
         return 401, {"error": "Please sign in again.", "code": "auth"}
     action = b.get("action")
+    # The browser helper's token may only build the Word file for a finished resume.
+    if claims.get("typ") == "ext" and action != "build":
+        return 403, {"error": "The browser helper can only build documents.", "code": "ext_scope"}
 
     if action == "extract":
         try:

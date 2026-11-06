@@ -2,7 +2,7 @@
 // server, keeps what each tab has found, and relays between the content scripts and
 // the side panel. It never opens a job board page itself.
 const API = 'https://aicareercoach.net/api/newpage'
-const KEYS = ['refresh', 'access', 'accessExp', 'profile', 'device']
+const KEYS = ['refresh', 'access', 'accessExp', 'profile', 'profileAt', 'device']
 const tabs = new Map() // tabId -> what the content script last reported
 
 const store = {
@@ -54,7 +54,7 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, reply) => {
   if (msg?.type === 'ping') return reply({ ok: true, version: chrome.runtime.getManifest().version })
   if (msg?.type === 'pair' && typeof msg.token === 'string') {
     store.set({ refresh: msg.token, access: null, accessExp: 0, device: msg.device || 'Browser' })
-      .then(() => api('ext_profile')).then(profile => store.set({ profile }))
+      .then(() => api('ext_profile')).then(profile => store.set({ profile, profileAt: Date.now() }))
       .then(() => reply({ ok: true })).catch(err => reply({ ok: false, error: err.message }))
     return true
   }
@@ -78,12 +78,17 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         const s = await store.get()
         return { paired: !!s.refresh, profile: s.profile || null, page: tabs.get(tabId) || null }
       }
-      case 'profile': { const profile = await api('ext_profile'); await store.set({ profile }); return profile }
+      case 'profile': { const profile = await api('ext_profile'); await store.set({ profile, profileAt: Date.now() }); return profile }
       case 'docs': return api('ext_docs')
       case 'fit': return api('ext_fit', msg.job)
       case 'answers': return api('ext_answers', { questions: msg.questions, text: msg.job?.text, title: msg.job?.title, company: msg.job?.company })
       case 'log': return api('ext_log', msg.application)
-      case 'capture': { const s = await store.get(); if (!s.profile?.capture) return { stored: 0, reason: 'off' }; return api('ext_capture', { listings: msg.listings }) }
+      case 'capture': { // the setting lives in the app; re-read it every half hour so a change there takes effect here
+        let s = await store.get()
+        if (!s.profile || !s.profileAt || Date.now() - s.profileAt > 30 * 60000) { try { await store.set({ profile: await api('ext_profile'), profileAt: Date.now() }) } catch { /* keep what we have */ } s = await store.get() }
+        if (!s.profile?.capture) return { stored: 0, reason: 'off' }
+        return api('ext_capture', { listings: msg.listings })
+      }
       case 'docx': return docxFor(msg.doc)
       case 'to-tab': return chrome.tabs.sendMessage(tabId, msg.payload) // side panel -> content script
       case 'unpair': await store.clear(); return { ok: true }
