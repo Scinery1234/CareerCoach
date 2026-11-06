@@ -15,7 +15,7 @@ const STEPS=[
 const VALUES=["Achievement","Adventure","Balance","Beauty","Belonging","Calm","Care","Community","Courage","Creativity","Culture","Curiosity","Faith","Fairness","Family","Freedom","Friendship","Fun","Growth","Health","Home","Honesty","Hope","Humour","Independence","Joy","Justice","Kindness","Learning","Love","Loyalty","Making a difference","Money","Nature","Peace","Purpose","Respect","Security","Simplicity","Spirituality","Stability","Success","Teamwork","Trust","Wisdom"];
 const INTROS={
   values:"Let's start with what matters most to you. Pick the values that feel like you, then put them in order. If you're stuck between two, tell me about them here and I'll ask a few questions.",
-  identity:"Now write some **I am a / I am an** statements. They can be who you've been, who you are now, or who you'd like to be. Not just work: all of you. Then put them in order of what feels most true for you today.",
+  identity:"Now write some **I am…** statements, like \"I am a mum\" or \"I am curious\". They can be who you've been, who you are now, or who you'd like to be. Not just work: all of you. Then put them in order of what feels most true for you today.",
   north:"Your North Star is the most exciting picture of your **#1 value** being lived by your **#1 I am**. It can be about any part of life. Work is there to support it. The words are yours. If you'd like, start telling me about it here and I'll ask questions to help you find them.",
   needs:"Now the practical bit: what you need from work. These are the things a job has to have for it to work in your life.",
   strengths:"Let's map your strengths in three groups: things you **know**, things you **can do**, and things you **love**. Aim for at least three in each.",
@@ -25,7 +25,12 @@ const INTROS={
   actions:"Now three small first steps you can take in the next two weeks. Each one should take under two hours and start with a doing word, like call, write or sign up.",
   calendar:"Last step: give each first step a time in your calendar so it actually happens.",
 };
-const CRISIS_KEYWORDS=["suicide","suicidal","kill myself","end my life","take my life","want to die","don't want to live","dont want to live","no reason to live","better off dead","end it all","can't go on","cant go on","not worth living","self-harm","self harm","hurt myself","cut myself","cutting myself","overdose","starve myself","harm myself"];
+// Explicit phrases open the support dialog. Softer ones, which also turn up in
+// ordinary frustration ("can't go on doing nights"), show a quiet line instead.
+// Both match whole words, with any apostrophe optional.
+const phraseRe=list=>new RegExp("\\b(?:"+list.map(k=>k.replace(/'/g,"['\u2019]?").replace(/-/g,"[- ]?").replace(/\s+/g,"\\s+")).join("|")+")\\b","i");
+const CRISIS_RE=phraseRe(["suicide","suicidal","kill myself","end my life","take my life","want to die","don't want to live","dont want to live","no reason to live","better off dead","better off without me","not worth living","never wake up","self-harm","hurt myself","cut myself","starve myself","harm myself"]);
+const HEAVY_RE=phraseRe(["end it all","can't go on","cant go on","cutting myself","overdose","disappear","no point"]);
 const RESOURCES=[{name:"Lifeline",number:"13 11 14",desc:"24/7 crisis support"},{name:"Beyond Blue",number:"1300 22 4636",desc:"Mental health support"},{name:"Emergency",number:"000",desc:"Immediate danger"},{name:"SANE Australia",number:"1800 18 7263",desc:"Mental illness support"},{name:"13YARN",number:"13 92 76",desc:"Aboriginal & Torres Strait Islander"}];
 const STORE_KEY="purposefields_compass_v1", GOAL_KEY="purposefields_goals", CONSENT_KEY="purposefields_consent_v1";
 const TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"Australia/Sydney"}catch{return "Australia/Sydney"}})();
@@ -80,7 +85,10 @@ const addDays=(d,n)=>{const[y,m,dd]=d.split("-").map(Number);return new Date(Dat
 const fmtDay=d=>{const[y,m,dd]=d.split("-").map(Number);return new Date(Date.UTC(y,m-1,dd)).toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});};
 const addMin=(t,m)=>{const[a,b]=(t||"10:00").split(":").map(Number);const x=Math.min(a*60+b+Number(m||0),23*60+59);return String(Math.floor(x/60)).padStart(2,"0")+":"+String(x%60).padStart(2,"0");};
 const fmtMoney=n=>n===""||n==null?"":"$"+Number(n).toLocaleString("en-AU");
-const iam=s=>{s=String(s||"").trim().replace(/^i\s*am\s*/i,"").trim();if(!s)return"";if(/^(a|an)\s/i.test(s))return "I am "+s.replace(/^(a|an)\s+/i,m=>m.toLowerCase());return "I am "+(/^[aeiou]/i.test(s)?"an ":"a ")+s;};
+// "I am" + whatever they typed. A leading article is lower-cased, and so is a
+// single capitalised word ("Learner"); multi-word input is left as typed so
+// names and places keep their capitals.
+const iam=s=>{s=String(s||"").trim().replace(/^i\s*am\s*/i,"").replace(/[.\s]+$/,"").trim();if(!s)return"";if(/^(a|an)\s/i.test(s))s=s.replace(/^(a|an)\s+/i,m=>m.toLowerCase());else if(/^[A-Z][a-z]+$/.test(s))s=s.toLowerCase();return "I am "+s;};
 const ckey=t=>`${t.know}|${t.do}|${t.love}`;
 function makeTrios(G,seen){
   const all=[];for(const k of G.know)for(const d of G.do)for(const l of G.love)all.push({know:k,do:d,love:l});
@@ -123,8 +131,8 @@ function renderSteps(){
 
 /* ================= finishing a step ================= */
 function finish(i){
-  if(i>=STEPS.length-1){S.done=true;S.reached=STEPS.length-1;saveGoals();}
-  else{S.reached=Math.max(S.reached,i+1);S.step=i+1;const k=STEPS[i+1].key;if(!turns.some(t=>t.intro===k)){turns.push({role:"assistant",content:INTROS[k],intro:k});addMsg("divider",STEPS[i+1].label);addMsg("ai",INTROS[k]);}}
+  if(i>=STEPS.length-1){S.done=true;S.editCal=false;S.reached=STEPS.length-1;saveGoals();}
+  else{const revisit=i<S.reached;S.reached=Math.max(S.reached,i+1);S.step=S.done?STEPS.length-1:revisit?S.reached:i+1;const k=STEPS[i+1].key;if(!turns.some(t=>t.intro===k)){turns.push({role:"assistant",content:INTROS[k],intro:k});addMsg("divider",STEPS[i+1].label);addMsg("ai",INTROS[k]);}}
   save();renderAll();$("wscroll").scrollTop=0;
 }
 function saveGoals(){
@@ -151,14 +159,15 @@ function rankList(arr,label,onChange,extra){
 function setBar(hint,buttons){const hb=$("barhint");hb.textContent=hint||"";hb.classList.remove("warn");const b=$("barbtns");b.innerHTML="";buttons.filter(Boolean).forEach(x=>b.append(x));}
 // A button that's always pressable; if something is missing it says what, instead of being greyed out.
 function needBtn(label,missing,action){return h("button",{class:"primary",type:"button",onclick:()=>{const m=missing().filter(Boolean);if(m.length){const hb=$("barhint");hb.textContent="Still needed: "+m.join(" · ");hb.classList.add("warn");return;}action();}},label);}
-function aiErr(e){return e?.code==="unavailable"?"Suggestions aren't switched on for this site.":e?.code==="rate_limited"?"Too many requests just now. Try again in a moment.":e?.code==="connection"?"Couldn't reach the server. Check your connection and try again.":"That didn't work. Try again.";}
-function heading(i,title,lead){return[h("span",{class:"kicker",text:`Step ${i+1} of ${STEPS.length}`}),h("h2",{text:title}),lead?h("p",{class:"lead",text:lead}):null];}
+const AI_ERR={unavailable:"Suggestions aren't switched on for this site.",rate_limited:"Too many requests just now. Try again in a moment.",connection:"Couldn't reach the server. Check your connection and try again.",overloaded:"Claude is very busy right now. Try again in a minute.",refused:"Claude couldn't answer that one. Try again or write your own.",cut_off:"The reply was cut short. Try again.",empty_completion:"Nothing new came back. Try again or write your own.",empty:"Nothing new came back. Try again or write your own.",error:"Something went wrong on our side. Try again in a moment."};
+function aiErr(e){return AI_ERR[e?.code]||"That didn't work. Try again.";}
+function heading(i,title,lead){return[h("span",{class:"kicker",text:`Step ${i+1} of ${STEPS.length}`}),h("h2",{text:title}),lead?h("p",{class:"lead",text:lead}):null].filter(Boolean);}
 const rr=()=>{save();renderWork();};
 
 function renderWork(){
   sortables.forEach(s=>{try{s.destroy()}catch{}});sortables=[];
   const w=$("wbody");w.innerHTML="";const i=S.step;const key=STEPS[i].key;
-  if(S.done&&i===STEPS.length-1){renderSummary(w);return;}
+  if(S.done&&i===STEPS.length-1&&!S.editCal){renderSummary(w);return;}
   ({values:stepValues,identity:stepIdentity,north:stepNorth,needs:stepNeeds,strengths:stepStrengths,mix:stepMix,choose:stepChoose,plan:stepPlan,actions:stepActions,calendar:stepCalendar})[key](w,i);
 }
 
@@ -182,11 +191,11 @@ function stepIdentity(w,i){
   const I=S.identity;
   if(I.stage==="write"){
     w.append(...heading(i,"Who are you?"));
-    w.append(h("ul",{class:"leadlist"},h("li",{text:"Write some \"I am a…\" or \"I am an…\" statements."}),h("li",{text:"They can be who you've been, who you are now, or who you'd love to be."}),h("li",{text:"Think about all of your life, not just work."})));
+    w.append(h("ul",{class:"leadlist"},h("li",{text:"Finish the sentence \"I am…\" a few times: a role, a quality, anything that's you."}),h("li",{text:"They can be who you've been, who you are now, or who you'd love to be."}),h("li",{text:"Think about all of your life, not just work."})));
     const add=()=>{const t=iam(I.inp);if(!t)return;I.items.push({text:t});I.inp="";rr();$("iInp")?.focus();};
     w.append(h("div",{class:"card"},
-      h("div",{class:"field"},h("label",{class:"flabel",for:"iInp",text:"Type the word or words that finish the sentence"}),h("div",{class:"addrow iamrow"},h("span",{class:"iampre",text:"I am a/an"}),h("input",{class:"text",id:"iInp",value:I.inp,placeholder:"e.g. mum, gardener, artist, teacher",oninput:e=>{I.inp=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();add();}}}),h("button",{class:"small",type:"button",onclick:add},"Add")))));
-    w.append(I.items.length?h("div",{class:"tags"},I.items.map((it,j)=>h("span",{class:"tag"},it.text,h("button",{class:"x",type:"button","aria-label":`Remove ${it.text}`,onclick:()=>{I.items.splice(j,1);rr();}},"×")))):h("p",{class:"empty",text:"Your statements will show up here. Aim for at least five."}));
+      h("div",{class:"field"},h("label",{class:"flabel",for:"iInp",text:"Type the word or words that finish the sentence"}),h("div",{class:"addrow iamrow"},h("span",{class:"iampre",text:"I am"}),h("input",{class:"text",id:"iInp",value:I.inp,placeholder:"e.g. a mum, a gardener, curious",oninput:e=>{I.inp=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();add();}}}),h("button",{class:"small",type:"button",onclick:add},"Add")))));
+    w.append(I.items.length?h("div",{class:"tags"},I.items.map((it,j)=>h("span",{class:"tag"},it.text,h("button",{class:"x",type:"button","aria-label":`Remove ${it.text}`,onclick:()=>{I.items.splice(j,1);rr();}},"×")))):h("p",{class:"empty",text:"Your statements will show up here. Aim for at least three."}));
     const n=I.items.length;
     setBar(`${n} written${n<3?" · write at least 3":""}`,[needBtn("Next: put them in order",()=>[n<3&&`write ${3-n} more "I am" statement${3-n===1?"":"s"}`],()=>{I.stage="rank";rr();})]);
   } else {
@@ -251,10 +260,11 @@ function stepMix(w,i){
     return h("div",{class:"card mixcard"},
       h("div",{class:"trio"},h("span",{class:"pl",text:String(j+1)}),h("span",{class:"slot on",text:t.know}),h("span",{class:"pl",text:"+"}),h("span",{class:"slot on",text:t.do}),h("span",{class:"pl",text:"+"}),h("span",{class:"slot on",text:t.love})),
       t.added.length?h("div",{class:"tags"},t.added.map(v=>h("span",{class:"tag got",text:"✓ "+v}))):null,
-      aiOn?h("button",{class:"mini",type:"button",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;b.textContent="Thinking…";
+      aiOn?(()=>{const st=h("span",{class:"hint"});const b=h("button",{class:"mini",type:"button",onclick:async()=>{b.disabled=true;st.textContent="Thinking…";
         try{const r=await api.suggest("mixIdea",{know:t.know,do:t.do,love:t.love,avoid:[...t.added,...M.ideas.map(d=>d.title)]});
-          if(typeof r?.idea==="string"&&r.idea.trim()){t.idea=r.idea.trim();save();const inp=$(id);if(inp){inp.value=t.idea;inp.focus();}}b.textContent="Suggest another";}
-        catch(e){b.textContent=aiErr(e);}b.disabled=false;}},"Suggest an idea for this mix"):null,
+          if(typeof r?.idea==="string"&&r.idea.trim()){t.idea=r.idea.trim();save();const inp=$(id);if(inp){inp.value=t.idea;inp.focus();}st.textContent="";}else st.textContent=aiErr({code:"empty"});
+          b.textContent="Suggest another";}
+        catch(e){st.textContent=aiErr(e);}b.disabled=false;}},"Suggest an idea for this mix");return h("div",{class:"airow"},b,st);})():null,
       h("div",{class:"addrow"},h("input",{class:"text",id,value:t.idea,placeholder:t.added.length?"Another idea?":"What job or work could this be?","aria-label":`Idea for mix ${j+1}`,oninput:e=>{t.idea=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();add();}}}),h("button",{class:"small",type:"button",onclick:add},"Add")));
   })));
   w.append(h("div",{class:"addrow",style:"align-items:center;flex-wrap:wrap"},h("span",{class:"hint",text:`${answered} of ${M.trios.length} mixes answered.`}),h("button",{class:"small alt",type:"button",onclick:()=>{M.trios=makeTrios(G,M.seen);M.seen.push(...M.trios.map(ckey));save();renderWork();$("wscroll").scrollTop=0;}},"Remix: 10 new mixes")));
@@ -301,7 +311,7 @@ function aiControl(label,againLabel,hasWork,run){
     if(!aiOn){status.textContent="Not switched on for this site.";return;}
     if(hasWork()&&!armed){armed=true;btn.textContent="Tap again to replace what's here";setTimeout(()=>{if(armed){armed=false;btn.textContent=used?againLabel:label;}},3500);return;}
     armed=false;btn.disabled=true;status.textContent="Thinking…";
-    try{await run();used=true;status.textContent="Change anything you like.";}catch(e){status.textContent=aiErr(e);}
+    try{const note=await run();used=true;status.textContent=note||"Change anything you like.";}catch(e){status.textContent=aiErr(e);}
     btn.disabled=false;btn.textContent=used?againLabel:label;}},label);
   return h("div",{class:"airow"},h("span",{class:"hint",text:"Drawing a blank?"}),btn,status);
 }
@@ -337,6 +347,7 @@ function stepActions(w,i){
     const {steps:list=[]}=await api.suggest("steps",{...profile(),planNow:S.plan.now});
     if(!list.length)throw {code:"empty"};
     list.forEach((x,j)=>{A[j]=x.trim();if(ins[j])ins[j].value=A[j];});save();
+    if(list.length<3)return `Only ${list.length===1?"one step":"two steps"} came back. Add the rest yourself or try again.`;
   }));
   const eg=["e.g. Call Sam to ask what her job is really like","e.g. Sign up for the free short course","e.g. Write a list of 5 places I'd love to work"];
   [0,1,2].forEach(j=>{const inp=h("input",{class:"text",id:"a"+j,value:A[j],placeholder:eg[j],oninput:e=>{A[j]=e.target.value;save();}});ins[j]=inp;w.append(h("div",{class:"field"},h("label",{class:"flabel",for:"a"+j,text:`Step ${j+1}`}),inp));});
@@ -364,7 +375,7 @@ function stepCalendar(w,i){
       h("select",{class:"text","aria-label":`Day for step ${j+1}`,onchange:e=>{s.date=e.target.value;save();}},days.map(d=>h("option",{value:d,selected:s.date===d},d===today()?"Today":fmtDay(d)))),
       h("input",{class:"text",type:"time","aria-label":`Start time for step ${j+1}`,value:s.start,step:900,onchange:e=>{s.start=e.target.value||"10:00";save();}}),
       h("select",{class:"text","aria-label":`How long for step ${j+1}`,onchange:e=>{s.dur=Number(e.target.value);save();}},[30,45,60,90,120].map(m=>h("option",{value:m,selected:Number(s.dur)===m},m<60?`${m} min`:m===60?"1 hour":m===90?"1½ hours":"2 hours"))))));});
-  setBar("You'll get calendar links on the next screen.",[h("button",{class:"primary",type:"button",onclick:()=>finish(i)},"Lock it in")]);
+  setBar(S.done?"Your map updates when you lock it in.":"You'll get calendar links on the next screen.",[S.done?h("button",{class:"secondary",type:"button",onclick:()=>{S.editCal=false;rr();}},"Back to my map"):null,h("button",{class:"primary",type:"button",onclick:()=>finish(i)},"Lock it in")]);
 }
 
 /* ================= summary ================= */
@@ -391,11 +402,11 @@ function renderSummary(w){
     h("div",{class:"acts"},h("button",{type:"button",onclick:ev=>saveFile("compass-first-steps.ics",ics(evts),ev.currentTarget)},"Download all three"))));
   w.append(sec("Top pick",h("p",{style:"font-size:20px;font-weight:600",text:S.choose.first}),S.choose.second?h("p",{class:"hint",text:`Second: ${S.choose.second}`}):null));
   w.append(sec("North Star",h("p",{class:"ns",text:S.north})));
-  w.append(sec("Values",h("p",{text:S.values.ranked.map((v,k)=>`${k+1}. ${v}`).join("   ")})));
+  w.append(sec("Values",h("p",{text:S.values.ranked.map((v,k)=>`${k+1}. ${v}`).join("\n"),style:"white-space:pre-line"})));
   w.append(sec("I am",h("p",{text:S.identity.items.map((x,k)=>`${k+1}. ${x.text}`).join("\n"),style:"white-space:pre-line"})));
   w.append(sec("Plan",...[["Now",S.plan.now],["Building",S.plan.building],["Making the move",S.plan.move],["Longer term",S.plan.longer]].filter(([,v])=>v).map(([k,v])=>h("p",{},h("b",{text:k+": "}),v))));
   w.append(sec("Strengths",h("p",{},h("b",{text:"I know: "}),S.strengths.know.join(", ")),h("p",{},h("b",{text:"I can do: "}),S.strengths.do.join(", ")),h("p",{},h("b",{text:"I love: "}),S.strengths.love.join(", "))));
-  setBar("Edit any step from the strip at the top.",[h("button",{class:"primary",type:"button",onclick:ev=>copyText(summaryText(),ev.currentTarget)},"Copy my map")]);
+  setBar("Edit any step from the strip at the top.",[h("button",{class:"secondary",type:"button",onclick:()=>{S.editCal=true;rr();$("wscroll").scrollTop=0;}},"Change days or times"),h("button",{class:"primary",type:"button",onclick:ev=>copyText(summaryText(),ev.currentTarget)},"Copy my map")]);
 }
 
 /* ================= chat ================= */
@@ -410,12 +421,13 @@ function context(){
   const snap={values_in_order:S.values.ranked.length?S.values.ranked:S.values.picked,i_am_in_order:S.identity.items.map(x=>x.text),north_star:S.north,needs:S.needs,strengths:S.strengths,ideas:S.mix.ideas.map(d=>d.title),top_pick:S.choose.first,second:S.choose.second,plan:S.plan,first_steps:S.actions};
   return `[Where they are] Step ${S.step+1} of ${STEPS.length}: ${st.label}. ${INTROS[st.key].replace(/\*\*/g,"")}\nTheir answers so far: ${JSON.stringify(snap)}`;
 }
-const ERR={unavailable:"Chat isn't switched on for this site.",rate_limited:"Too many messages just now. Wait a moment, then try again.",overloaded:"Claude is very busy right now. Try again in a minute.",connection:"Couldn't reach the server. Check your connection and send again.",refused:"Claude couldn't answer that. Try saying it another way.",empty_completion:"No reply came back. Try again.",prompt_too_large:"This chat has grown too long. Press Start over to begin a fresh one (your answers will be cleared)."};
+const ERR={unavailable:"Chat isn't switched on for this site.",rate_limited:"Too many messages just now. Wait a moment, then try again.",overloaded:"Claude is very busy right now. Try again in a minute.",connection:"Couldn't reach the server. Check your connection and send again.",refused:"Claude couldn't answer that. Try saying it another way.",empty_completion:"No reply came back. Try again.",prompt_too_large:"This chat has grown too long. Press Start over to begin a fresh one (your answers will be cleared).",cut_off:"The reply was cut short. Try again.",error:"Something went wrong on our side. Try again in a moment."};
 function setBusy(b){busy=b;const btn=$("sendBtn");btn.classList.toggle("stop",b);btn.textContent=b?"Stop":"Send";btn.disabled=b?false:(!aiOn||!$("box").value.trim());}
 async function send(text){
   text=(text||"").trim();if(!text||busy)return;
-  if(CRISIS_KEYWORDS.some(k=>text.toLowerCase().includes(k)))openCrisis();
-  addMsg("me",text);turns.push({role:"user",content:text});save();
+  if(CRISIS_RE.test(text))openCrisis();
+  const {m:mine}=addMsg("me",text);turns.push({role:"user",content:text});save();
+  if(!CRISIS_RE.test(text)&&HEAVY_RE.test(text))$("log").append(h("div",{class:"note",text:"If things are feeling heavy, Lifeline is there any time on 13 11 14."}));
   if(!aiOn)return;
   const {m,b}=addMsg("ai","Thinking…");b.classList.add("thinking");
   ctl=new AbortController();setBusy(true);
@@ -426,7 +438,12 @@ async function send(text){
     b.classList.remove("thinking");b.innerHTML=rich(reply);turns.push({role:"assistant",content:reply});
   }catch(e){
     b.classList.remove("thinking");
-    if(e?.text){b.innerHTML=rich(e.text);turns.push({role:"assistant",content:e.text});}else m.remove();
+    if(e?.text){b.innerHTML=rich(e.text);turns.push({role:"assistant",content:e.text});}
+    else{m.remove();
+      // Nothing came back, so the question was never answered. Take it out of the
+      // history (otherwise it's resent forever) and put the words back to edit or resend.
+      if(turns.at(-1)?.role==="user"&&turns.at(-1).content===text){turns.pop();mine.remove();}
+      if(e?.code!=="cancelled"&&!box.value.trim()){box.value=text;box.dispatchEvent(new Event("input"));}}
     if(e?.code!=="cancelled"){const note=h("div",{class:"note",text:ERR[e?.code]||"The connection dropped. Try sending again."});if(m.isConnected)m.append(note);else $("log").append(note);}
   }
   save();setBusy(false);scrollDown();
@@ -434,19 +451,28 @@ async function send(text){
 
 /* ================= wiring ================= */
 function renderAll(){renderSteps();renderWork();}
-function openCrisis(){$("crisis").hidden=false;$("crisisClose").focus();}
+// Keep Tab inside an open dialog, and let Escape close the ones that may be closed.
+function trapFocus(dlg,onEscape){dlg.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&onEscape){e.preventDefault();onEscape();return;}
+  if(e.key!=="Tab")return;const f=[...dlg.querySelectorAll("button,input,a[href],textarea,select,[tabindex]:not([tabindex='-1'])")].filter(x=>!x.disabled&&x.offsetParent!==null);if(!f.length)return;
+  const first=f[0],last=f.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});}
+let crisisFrom=null;
+function openCrisis(){crisisFrom=document.activeElement;$("crisis").hidden=false;$("crisisClose").focus();}
+function closeCrisis(){$("crisis").hidden=true;if(crisisFrom?.isConnected&&!$("consent").hidden)$("consentGo").focus();else crisisFrom?.focus?.();}
+trapFocus($("crisis"),closeCrisis);trapFocus($("consent"),null);
 $("resList").append(...RESOURCES.map(r=>h("div",{},h("span",{},h("b",{text:r.name}),h("small",{text:r.desc})),h("a",{href:"tel:"+r.number.replace(/\s/g,""),text:r.number}))));
-$("helpBtn").onclick=openCrisis;$("crisisClose").onclick=()=>{$("crisis").hidden=true;};
+$("helpBtn").onclick=openCrisis;$("crisisClose").onclick=closeCrisis;
 const cks=["c1","c2","c3","c4"].map($);
 cks.forEach(c=>c.addEventListener("change",()=>{$("consentGo").disabled=!cks.every(x=>x.checked);}));
 $("consentGo").onclick=()=>{store.set(CONSENT_KEY,JSON.stringify({timestamp:Date.now()}));$("consent").hidden=true;};
 $("consentHelp").onclick=openCrisis;
 try{const c=JSON.parse(store.get(CONSENT_KEY)||"null");if(!c||(Date.now()-c.timestamp)/864e5>=90)$("consent").hidden=false;}catch{$("consent").hidden=false;}
+if(!$("consent").hidden)$("c1").focus();
 
 const box=$("box");
 box.addEventListener("input",()=>{box.style.height="auto";box.style.height=Math.min(box.scrollHeight,130)+"px";if(!busy)$("sendBtn").disabled=!aiOn||!box.value.trim();});
 box.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}});
-function go(){const t=box.value;if(!t.trim()||busy)return;box.value="";box.style.height="auto";$("sendBtn").disabled=true;send(t);}
+function go(){const t=box.value;if(!t.trim()||busy||!aiOn)return;box.value="";box.style.height="auto";$("sendBtn").disabled=true;send(t);}
 $("sendBtn").onclick=()=>{if(busy){ctl?.abort();return;}go();};
 function setTab(talk){document.body.classList.toggle("talk",talk);$("tabWork").setAttribute("aria-selected",String(!talk));$("tabTalk").setAttribute("aria-selected",String(talk));if(talk)scrollDown();}
 $("tabWork").onclick=()=>setTab(false);$("tabTalk").onclick=()=>setTab(true);
@@ -454,7 +480,7 @@ $("tabWork").onclick=()=>setTab(false);$("tabTalk").onclick=()=>setTab(true);
 let armed=null;
 $("restart").onclick=()=>{const btn=$("restart");
   if(!armed){btn.textContent="Tap again to clear everything";armed=setTimeout(()=>{btn.textContent="Start over";armed=null;},3000);return;}
-  clearTimeout(armed);armed=null;btn.textContent="Start over";ctl?.abort();S=blank();turns=[];store.del(STORE_KEY);boot();};
+  clearTimeout(armed);armed=null;btn.textContent="Start over";ctl?.abort();S=blank();turns=[];store.del(STORE_KEY);store.del(GOAL_KEY);boot();};
 
 function boot(){
   if(!turns.length)turns.push({role:"assistant",content:INTROS.values,intro:"values"});
