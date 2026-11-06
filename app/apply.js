@@ -209,6 +209,62 @@ function searchCard(ctx) {
     h('label', { class: 'row ap-switch' }, h('input', { type: 'checkbox', ...(s.alertEmails ? { checked: '' } : {}), onchange: e => emails(e.target.checked) }), h('span', { class: 'small' }, 'Email me when a strong fit appears (at most one email every six hours, never on the first check).')))
 }
 
+// ── The browser helper ──
+const EXTENSION_ID = window.NP_EXTENSION_ID || ''   // set in app/index.html once the Web Store id is known
+const STORE_URL = window.NP_EXTENSION_STORE || ''
+const STANDARD = [
+  ['workRights', 'Right to work in Australia', 'e.g. Australian citizen, permanent resident, or your visa and its work conditions'],
+  ['notice', 'Notice period or when you can start', 'e.g. Two weeks, or Immediately'],
+  ['salary', 'Salary expectation', 'A figure or range, or Negotiable'],
+  ['licence', 'Driver licence and vehicle', 'e.g. Full licence, own car'],
+  ['hoursAvailable', 'Hours and days you can work', 'e.g. Weekdays, school hours'],
+  ['relocate', 'Willing to relocate or travel', ''],
+  ['checks', 'Checks you hold', 'e.g. Working with Children Check, NDIS Worker Screening, Police Check (2025)'],
+  ['qualifications', 'Qualifications and tickets', 'e.g. Certificate III Individual Support, First Aid, White Card']
+]
+const ping = () => new Promise(r => { try { if (!EXTENSION_ID || !window.chrome?.runtime?.sendMessage) return r(null); chrome.runtime.sendMessage(EXTENSION_ID, { type: 'ping' }, x => r(chrome.runtime.lastError ? null : x)) } catch { r(null) } })
+const pairWith = token => new Promise(r => { try { chrome.runtime.sendMessage(EXTENSION_ID, { type: 'pair', token, device: navigator.userAgentData?.brands?.[0]?.brand || 'Browser' }, x => r(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : x)) } catch (e) { r({ ok: false, error: e.message }) } })
+
+function helperCard(ctx) {
+  const H = (L.helper ||= { ext: undefined, list: null, busy: false })
+  if (H.ext === undefined) { H.ext = null; ping().then(x => { H.ext = x; ctx.render() }) }
+  if (H.list === null) { H.list = []; ctx.call('/api/newpage/app', { action: 'extension_list' }).then(d => { H.list = d.extensions; ctx.render() }).catch(() => {}) }
+  const connect = async () => {
+    if (H.busy) return
+    H.busy = true; L.err = ''; ctx.render()
+    try {
+      const d = await ctx.call('/api/newpage/app', { action: 'extension_pair', device: navigator.userAgentData?.brands?.[0]?.brand || 'Browser' })
+      const r = await pairWith(d.token)
+      if (!r?.ok) throw new Error(r?.error || 'The helper did not accept the connection. Is it installed and enabled?')
+      H.list = d.extensions; L.note = 'Connected. Open a job on Seek or Indeed and the helper’s panel will show your documents and answers.'
+    } catch (e) { L.err = e.message }
+    H.busy = false; ctx.render()
+  }
+  const revoke = async id => { try { const d = await ctx.call('/api/newpage/app', { action: 'extension_revoke', id }); H.list = d.extensions; L.note = 'Disconnected.' } catch (e) { L.err = e.message } ctx.render() }
+  return h('div', { class: 'card' }, h('span', { class: 'label' }, 'The browser helper'),
+    h('p', { class: 'small muted' }, 'A small Chrome or Edge extension that carries your tailored resume, cover letter and standard answers into Seek and Indeed application forms, and shows how well each job fits you. It fills; you read and press Submit. It never submits for you, and it never opens job pages on its own.'),
+    !EXTENSION_ID ? h('p', { class: 'small' }, 'The helper isn’t published yet.')
+      : H.ext ? h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'button', disabled: H.busy, onclick: connect }, H.busy ? 'Connecting…' : 'Connect this browser'), h('span', { class: 'small muted' }, `Helper ${H.ext.version} is installed.`))
+        : h('div', { class: 'row' }, STORE_URL && h('a', { class: 'btn btn-secondary', href: STORE_URL, target: '_blank', rel: 'noopener' }, 'Install the helper'), h('span', { class: 'small muted' }, 'Not detected in this browser. Install it, then come back here and press Connect.')),
+    (H.list || []).length > 0 && h('div', {}, h('span', { class: 'small' }, 'Connected browsers:'), h('ul', { class: 'small' }, H.list.map(x => h('li', {}, `${x.device || 'Browser'}, connected ${fmt(String(x.created_at).slice(0, 10))}${x.last_used_at ? `, last used ${fmt(String(x.last_used_at).slice(0, 10))}` : ''} `, h('button', { class: 'link-btn danger small', type: 'button', onclick: () => revoke(x.id) }, 'Disconnect')))),
+      H.list.length > 1 && h('button', { class: 'link-btn small', type: 'button', onclick: () => revoke('all') }, 'Disconnect all')))
+}
+
+function answersCard(ctx) {
+  const s = ctx.S.me.applySettings || {}
+  const A = (L.answers ||= { ...(s.answers || {}), custom: [...((s.answers || {}).custom || [])] })
+  const save = async () => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_answers_set', answers: A, capture: L.capture ?? s.capture }); absorb(ctx, d); L.note = 'Saved.' } catch (e) { L.err = e.message } ctx.render() }
+  return h('form', { class: 'card doc-form', onsubmit: e => { e.preventDefault(); save() } },
+    h('span', { class: 'label' }, 'Standard answers'),
+    h('p', { class: 'small muted' }, 'The questions nearly every application asks. Write them once; the helper puts them in for you, and Sky’s drafted answers never contradict them. Leave blank anything you’d rather answer each time.'),
+    h('div', { class: 'ap-fields' }, STANDARD.map(([id, label, hint]) => h('label', { class: 'field' }, h('span', {}, label), h('input', { value: A[id] || '', placeholder: hint, oninput: e => { A[id] = e.target.value } })))),
+    h('div', {}, h('span', { class: 'small' }, h('b', {}, 'Your own questions and answers'), ' (for the ones you keep seeing, like “Why do you want to work with us?”)'),
+      A.custom.map((c, i) => h('div', { class: 'ap-fields' }, h('label', { class: 'field' }, h('span', {}, 'Question'), h('input', { value: c.q, oninput: e => { c.q = e.target.value } })), h('label', { class: 'field' }, h('span', {}, 'Answer'), h('textarea', { rows: 2, value: c.a, oninput: e => { c.a = e.target.value } })), h('button', { class: 'link-btn danger small', type: 'button', onclick: () => { A.custom.splice(i, 1); ctx.render() } }, 'Remove'))),
+      A.custom.length < 12 && h('button', { class: 'link-btn blue', type: 'button', onclick: () => { A.custom.push({ q: '', a: '' }); ctx.render() } }, 'Add one')),
+    h('label', { class: 'row ap-switch' }, h('input', { type: 'checkbox', ...((L.capture ?? s.capture) ? { checked: '' } : {}), onchange: e => { L.capture = e.target.checked } }), h('span', { class: 'small' }, 'When I search on Seek, Indeed or Jora myself, let the helper read the results on my screen and add the good fits to Today. Only the page I’m looking at, never more.')),
+    h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save')))
+}
+
 function targetCard(ctx) {
   const save = async v => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_settings_set', weeklyTarget: v }); absorb(ctx, d); L.target = d.applySettings?.weeklyTarget || ''; L.note = L.target ? `Target set: ${L.target} a week.` : 'No weekly target.' } catch (e) { L.err = e.message } ctx.render() }
   return h('div', { class: 'card' }, h('span', { class: 'label' }, 'A weekly rhythm, if you want one'),
@@ -234,6 +290,8 @@ export function applyScreen(ctx) {
         h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => ctx.go('tools', 'resume') }, 'Open the resume writer')))
       : groups.filter(([, g]) => g.length).map(([name, g]) => h('div', { class: 'ap-group' }, h('h3', { class: 'group' }, `${name} (${g.length})`), h('ul', { class: 'ap-list' }, g.map(a => row(ctx, a))))),
     searchCard(ctx),
+    answersCard(ctx),
+    helperCard(ctx),
     targetCard(ctx),
     skyCard(ctx))
 }

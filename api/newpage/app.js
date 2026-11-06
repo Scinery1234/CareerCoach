@@ -28,8 +28,10 @@ import {
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
-import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS, DISMISS_REASONS } from '../../lib/newpage-apply.js'
+import { cleanApplication, cleanApplicationPatch, cleanApplySettings, pipelineSummary, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS, DISMISS_REASONS } from '../../lib/newpage-apply.js'
 import { fitWords } from '../../lib/newpage-fit.js'
+import { APP_COLS, sealApplication, openApplication, listApplications, addApplication, patchApplySettings as storePatchApplySettings } from '../../lib/newpage-apply-store.js'
+import { createHash, randomBytes } from 'node:crypto'
 import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
 
@@ -64,15 +66,6 @@ async function setTool(member, tool, value) {
   await supabase.from('newpage_tools').upsert({ member_id: member.id, tool, data: sealJson(v, `tool:${tool}`, value), updated_at: new Date().toISOString() }, { onConflict: 'member_id,tool' })
 }
 
-// Application log rows: the personal fields are sealed with the member's key.
-const sealApplication = (vault, row) => { const out = { ...row }; for (const f of SEALED_FIELDS) if (typeof out[f] === 'string' && out[f]) out[f] = sealText(vault, 'app', out[f]); return out }
-const openApplication = (vault, row) => { const out = { ...row }; for (const f of SEALED_FIELDS) if (typeof out[f] === 'string') out[f] = openText(vault, 'app', out[f]); return out }
-const APP_COLS = 'id, title, company, board, url, status, applied_at, status_at, fit, source, notes, resume_doc_id, cover_doc_id, created_at'
-async function listApplications(member, vault) {
-  const { data } = await supabase.from('newpage_applications').select(APP_COLS).eq('member_id', member.id).order('created_at', { ascending: false }).limit(500)
-  return (data || []).map(a => openApplication(vault, a))
-}
-
 // Where they are with applying and whether Sky should offer. `matches` (the match
 // tables of recent tailored resumes) is only to hand in the coach action.
 function applyState({ docs, applications, applySettings, matches = [], dismissals = [] }) {
@@ -80,15 +73,16 @@ function applyState({ docs, applications, applySettings, matches = [], dismissal
   const patterns = applyPatterns({ apps: applications, matches, dismissals })
   return { stage, patterns, offer: applySettings.offer, emails: applySettings.emails, decision: offerDecision({ stage, patterns, offer: applySettings.offer }) }
 }
+async function extensions(member) {
+  const { data } = await supabase.from('newpage_extension_tokens').select('id, device, created_at, last_used_at').eq('member_id', member.id).is('revoked_at', null).order('created_at', { ascending: false }).limit(10)
+  return { extensions: data || [] }
+}
+
 function withMatches(data, matches) {
   const patterns = applyPatterns({ apps: data.applications, matches, dismissals: data.dismissals })
   return { ...data.apply, patterns, decision: offerDecision({ stage: data.apply.stage, patterns, offer: data.applySettings.offer }) }
 }
-async function patchApplySettings(member, patch) {
-  const next = cleanApplySettings({ ...cleanApplySettings(await getTool(member, 'apply')), ...patch })
-  await setTool(member, 'apply', next)
-  return next
-}
+const patchApplySettings = storePatchApplySettings
 
 async function load(member, coach = 'career') {
   const memberId = member.id
@@ -422,17 +416,10 @@ export default async function handler(req, res) {
       if (!row) return res.status(400).json({ error: 'Add the role title first.' })
       let vault
       try { vault = await writeVault(member) } catch (err) { return res.status(err.status || 500).json({ error: err.message }) }
-      // Documents must be the member's own. A tailored resume brings its match table along as the fit.
-      const docIds = ['resume_doc_id', 'cover_doc_id'].filter(k => ID_RE.test(String(b[k] || '')))
-      const docs = docIds.length ? (await supabase.from('newpage_docs').select('id, kind, content').eq('member_id', member.id).in('id', docIds.map(k => b[k]))).data || [] : []
-      for (const k of docIds) { const d = docs.find(x => x.id === b[k]); if (!d) return res.status(404).json({ error: 'That document isn’t in your account.' }); row[k] = d.id; if (k === 'resume_doc_id') row.fit = fitFromDoc(d.content) }
-      const existing = await listApplications(member, vault)
-      const dup = findDuplicate(existing, row)
-      if (dup) return res.json({ application: dup, duplicate: true, ...(await me(member, coachOf(b.coach))) })
-      const { data: saved, error } = await supabase.from('newpage_applications').insert({ member_id: member.id, ...sealApplication(vault, row), status_at: new Date().toISOString() }).select(APP_COLS).single()
-      if (error) return res.status(500).json({ error: 'That didn’t save. Please try again.' })
-      if (ID_RE.test(String(b.alert_id || ''))) await supabase.from('newpage_alerts').update({ state: 'applied' }).eq('id', b.alert_id).eq('member_id', member.id)
-      return res.json({ application: openApplication(vault, saved), duplicate: false, ...(await me(member, coachOf(b.coach))) })
+      try {
+        const r = await addApplication(member, vault, row, { resume_doc_id: b.resume_doc_id, cover_doc_id: b.cover_doc_id, alert_id: b.alert_id })
+        return res.json({ ...r, ...(await me(member, coachOf(b.coach))) })
+      } catch (err) { return res.status(err.status || 500).json({ error: err.message }) }
     }
     case 'apply_update': {
       if (!ID_RE.test(String(b.id))) return res.status(400).json({ error: 'Unknown application.' })
@@ -457,6 +444,29 @@ export default async function handler(req, res) {
       await patchApplySettings(member, patch)
       return res.json(await me(member, coachOf(b.coach)))
     }
+    // ── The browser helper (extension) ──
+    case 'extension_pair': {
+      // One pairing token, shown to the member's browser once; only its hash is kept.
+      if (isDemo(member)) return res.status(403).json({ error: 'The browser helper isn’t in the demo.', code: 'demo' })
+      const token = randomBytes(32).toString('base64url')
+      const { data: mine } = await supabase.from('newpage_extension_tokens').select('id').eq('member_id', member.id).is('revoked_at', null)
+      if ((mine || []).length >= 5) return res.status(400).json({ error: 'Five browsers are already connected. Disconnect one first.' })
+      await supabase.from('newpage_extension_tokens').insert({ member_id: member.id, token_hash: createHash('sha256').update(token).digest('hex'), device: clip(b.device, 80) || 'Browser' })
+      return res.json({ token, ...(await extensions(member)) })
+    }
+    case 'extension_list':
+      return res.json(await extensions(member))
+    case 'extension_revoke': {
+      if (b.id === 'all') await supabase.from('newpage_extension_tokens').update({ revoked_at: new Date().toISOString() }).eq('member_id', member.id).is('revoked_at', null)
+      else if (ID_RE.test(String(b.id))) await supabase.from('newpage_extension_tokens').update({ revoked_at: new Date().toISOString() }).eq('id', b.id).eq('member_id', member.id)
+      else return res.status(400).json({ error: 'Unknown browser.' })
+      return res.json(await extensions(member))
+    }
+    case 'apply_answers_set': {
+      await patchApplySettings(member, { answers: b.answers, ...(b.capture !== undefined ? { capture: b.capture === true } : {}) })
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+
     case 'alert_list': {
       const { data } = await supabase.from('newpage_alerts').select('id, title, company, location, salary, url, board, posted_at, fit, state, dismiss_reason, created_at').eq('member_id', member.id).neq('dismiss_reason', 'stale').neq('dismiss_reason', 'filter').order('created_at', { ascending: false }).limit(100)
       return res.json({ alerts: (data || []).map(a => ({ ...a, words: fitWords(a.fit) })) })
@@ -878,10 +888,9 @@ export default async function handler(req, res) {
           if (name === 'log_application') {
             const row = cleanApplication({ ...input, status: input.status === 'saved' ? 'saved' : 'applied', source: 'member' })
             if (!row) return 'No role title given.'
-            const dup = findDuplicate(data.applications, row)
-            if (dup) return `Already logged: ${dup.title}${dup.company ? ' at ' + dup.company : ''} (${dup.status}).`
-            const { data: saved } = await supabase.from('newpage_applications').insert({ member_id: member.id, ...sealApplication(vault, row), status_at: new Date().toISOString() }).select(APP_COLS).single()
-            if (saved) data.applications.unshift(openApplication(vault, saved))
+            const r = await addApplication(member, vault, row, {})
+            if (r.duplicate) return `Already logged: ${r.application.title}${r.application.company ? ' at ' + r.application.company : ''} (${r.application.status}).`
+            data.applications.unshift(r.application)
             return `Logged: ${row.title}${row.company ? ' at ' + row.company : ''}, ${row.status === 'saved' ? 'saved to apply for' : 'applied ' + row.applied_at}.`
           }
           if (name === 'update_application') {

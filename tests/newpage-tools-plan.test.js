@@ -22,7 +22,7 @@ test('the tools membership is a $25 monthly Stripe subscription, priced on the s
 })
 
 test('fair-use limits: 300 messages, 3 resumes, 150 tailored, 100 cover letters a month, Sydney months', () => {
-  assert.deepEqual(TOOLS_CAPS, { messages: 300, resumes: 3, tailored: 150, covers: 100, fit: 600 })
+  assert.deepEqual(TOOLS_CAPS, { messages: 300, resumes: 3, tailored: 150, covers: 100, fit: 600, answers: 300 })
   assert.equal(monthKey(new Date('2027-03-31T14:30:00Z')), '2027-04', 'half past midnight on 1 April in Sydney is April')
   assert.equal(monthKey(new Date('2027-03-31T12:00:00Z')), '2027-03')
   assert.ok(isTools({ source: 'tools' }) && !isTools({ source: 'purchase' }) && !isTools(null))

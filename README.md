@@ -12,6 +12,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `app/` | The member app: Today, Coach (Sky), Tools, Me. Plain HTML, CSS and JS, no build step. |
 | `join/`, `demo/`, `memory/`, `admin/` | Paying, the demo, the memory page linked from retention emails, and the admin (members, demo feedback, the content editor, "Is everything working?"). `admin/bookings.html` manages the human coach's availability and bookings. |
 | `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`, `applycheck` (Sunday note about the week's applications, for members who turned it on), `alerts` (hourly: new listings from Adzuna scored for fit, see below). |
+| `extension/` | The browser helper (Chrome and Edge extension) for Seek and Indeed forms: fit verdict, documents into the form, standard and drafted answers, logging. Fills; never submits. Paired from Tools, Applications; served by `api/newpage/extension.js`. See `extension/README.md`. |
 | `lib/newpage-apply.js`, `app/apply.js` | The application log: what a member applied for and what came back. Logged from the end of the tailor and cover letter flows or by hand under Tools, Applications; the week's count is on Today. Sky knows where the member is with applying (worked out in code, not guessed), offers help once at the right moment, respects a no, and has an Applying focus plus tools to log and update applications when the member says so. Plan for the rest of this work: `docs/APPLY_PLAN.md`. |
 | `api/newpage/resume.py`, `docx.py`, `api/_py/` | Python: the resume agent, the Word builders, usage limits. |
 | `api/bookings`, `api/availability.js`, `api/session-types.js`, `api/admin/*` | The booking engine for sessions with the human coach. |
@@ -65,4 +66,4 @@ npm test
 python3 -m unittest discover -s tests/py
 ```
 
-Handler tests run against an in-memory Supabase (`tests/helpers/fake-supabase.js`), installed on `globalThis.__fakeSupabase` before `lib/supabase.js` is imported, so no database or network is needed.
+`npm test` also runs `extension/tests`, which load the content scripts into a small DOM (linkedom) against saved form pages. Handler tests run against an in-memory Supabase (`tests/helpers/fake-supabase.js`), installed on `globalThis.__fakeSupabase` before `lib/supabase.js` is imported, so no database or network is needed.

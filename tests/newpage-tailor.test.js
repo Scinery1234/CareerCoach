@@ -104,5 +104,5 @@ test('Sky is told about recent tailoring and the tailor-or-rebuild rule', () => 
 })
 
 test('the caps give room for a high-volume search', () => {
-  assert.deepEqual(TOOLS_CAPS, { messages: 300, resumes: 3, tailored: 150, covers: 100, fit: 600 })
+  assert.deepEqual(TOOLS_CAPS, { messages: 300, resumes: 3, tailored: 150, covers: 100, fit: 600, answers: 300 })
 })

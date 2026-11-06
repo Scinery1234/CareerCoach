@@ -43,6 +43,9 @@
     },
     "api/newpage/alerts.js": {
       "maxDuration": 300
+    },
+    "api/newpage/extension.js": {
+      "maxDuration": 60
     }
   },
   "headers": [

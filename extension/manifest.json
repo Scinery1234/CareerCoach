@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "AI Career Coach Apply",
+  "version": "0.1.0",
+  "description": "Carries your tailored resume, cover letter and standard answers into Seek and Indeed application forms. You press Submit; it never does.",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_title": "AI Career Coach Apply" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["storage", "sidePanel", "activeTab"],
+  "host_permissions": [
+    "https://www.seek.com.au/*",
+    "https://www.seek.co.nz/*",
+    "https://au.indeed.com/*",
+    "https://www.indeed.com/*",
+    "https://au.jora.com/*",
+    "https://aicareercoach.net/*"
+  ],
+  "externally_connectable": { "matches": ["https://aicareercoach.net/*"] },
+  "content_scripts": [
+    { "matches": ["https://www.seek.com.au/*", "https://www.seek.co.nz/*"], "js": ["content/forms.js", "content/seek.js", "content/capture.js"], "run_at": "document_idle" },
+    { "matches": ["https://au.indeed.com/*", "https://www.indeed.com/*"], "js": ["content/forms.js", "content/indeed.js", "content/capture.js"], "run_at": "document_idle" },
+    { "matches": ["https://au.jora.com/*"], "js": ["content/forms.js", "content/capture.js"], "run_at": "document_idle" }
+  ]
+}

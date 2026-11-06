@@ -20,7 +20,8 @@ def session_claims(token: str):
         if not hmac.compare_digest(want, _b64url(sig)):
             return None
         p = json.loads(_b64url(body))
-        return p if p.get("typ") == "session" and float(p.get("exp", 0)) > time.time() else None
+        # "ext" is the browser helper's short-lived token: it may build documents, nothing more.
+        return p if p.get("typ") in ("session", "ext") and float(p.get("exp", 0)) > time.time() else None
     except Exception:
         return None
 

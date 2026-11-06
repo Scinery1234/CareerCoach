@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en-AU">
+<head><meta charset="utf-8"><title>Apply for Aged Care Worker - Residential | SEEK</title></head>
+<body>
+<main>
+  <h1>Answer the employer’s questions</h1>
+  <form>
+    <div class="field">
+      <label for="q-first">First name</label>
+      <input id="q-first" type="text" name="firstName">
+    </div>
+    <div class="field">
+      <label for="q-last">Last name</label>
+      <input id="q-last" type="text" name="lastName">
+    </div>
+    <div class="field">
+      <label for="q-email">Email address</label>
+      <input id="q-email" type="email" name="email">
+    </div>
+    <div class="field">
+      <label for="q-phone">Mobile phone</label>
+      <input id="q-phone" type="tel" name="phone">
+    </div>
+
+    <fieldset>
+      <legend>Which of the following statements best describes your right to work in Australia?</legend>
+      <label><input type="radio" name="rtw" value="citizen"> I'm an Australian citizen</label>
+      <label><input type="radio" name="rtw" value="pr"> I'm a permanent resident</label>
+      <label><input type="radio" name="rtw" value="sponsor"> I require sponsorship to work for a new employer</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Do you have a current driver's licence?</legend>
+      <label><input type="radio" name="licence" value="yes"> Yes</label>
+      <label><input type="radio" name="licence" value="no"> No</label>
+    </fieldset>
+
+    <div class="field">
+      <label for="q-notice">What is your notice period?</label>
+      <select id="q-notice" name="notice">
+        <option value="">Select</option>
+        <option value="now">Available immediately</option>
+        <option value="1w">1 week</option>
+        <option value="2w">2 weeks</option>
+        <option value="4w">4 weeks</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="q-cert">Which of the following Certificate III qualifications do you hold?</label>
+      <input id="q-cert" type="text" name="cert">
+    </div>
+
+    <div class="field">
+      <p id="q-story-label">Tell us about a time you supported a resident through a difficult day.</p>
+      <textarea id="q-story" aria-labelledby="q-story-label" name="story" rows="4"></textarea>
+    </div>
+
+    <input type="hidden" name="token" value="abc">
+    <button type="button" data-automation="continue-button">Continue</button>
+    <button type="submit">Submit application</button>
+  </form>
+</main>
+</body>
+</html>

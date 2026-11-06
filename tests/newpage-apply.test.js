@@ -92,7 +92,7 @@ test('settings: the weekly target is a whole number from 1 to 50, or none', () =
   assert.equal(cleanApplySettings({ weeklyTarget: 0 }).weeklyTarget, null)
   assert.equal(cleanApplySettings({ weeklyTarget: 500 }).weeklyTarget, null)
   const empty = cleanApplySettings(null)
-  assert.deepEqual(empty, { weeklyTarget: null, offer: null, emails: false, roles: [], locations: [], radiusKm: 25, salaryFloor: 0, hours: 'any', fitFloor: 60, alertEmails: false, lastPolledAt: null, firstPollDone: false, lastAlertEmailAt: null })
+  assert.deepEqual(empty, { weeklyTarget: null, offer: null, emails: false, roles: [], locations: [], radiusKm: 25, salaryFloor: 0, hours: 'any', fitFloor: 60, alertEmails: false, lastPolledAt: null, firstPollDone: false, lastAlertEmailAt: null, answers: {}, capture: false })
   // Search preferences: a comma list or an array, deduplicated case-insensitively, capped, bad values replaced by defaults.
   const s = cleanApplySettings({ roles: 'Cook, chef, COOK, , a, b, c, d', locations: ['Geelong', 'geelong', 'Lara'], radiusKm: 999, salaryFloor: -5, hours: 'nights', fitFloor: '75', alertEmails: 'yes' })
   assert.deepEqual(s.roles, ['Cook', 'chef', 'a', 'b', 'c'])

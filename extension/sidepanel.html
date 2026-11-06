@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Career Coach Apply</title>
+<style>
+  :root { --ink: #15203B; --muted: #56607A; --rule: #DCE3EE; --hl: #FFF1C9; --bg: #F5F7FB; --ok: #2e7d4f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 Figtree, -apple-system, Segoe UI, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  main { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: #fff; border: 1.5px solid var(--rule); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 17px; margin: 0; } h2 { font-size: 15px; margin: 0; }
+  p { margin: 0; } .small { font-size: 13px; } .muted { color: var(--muted); }
+  .btn { font: inherit; font-weight: 700; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 14px; background: var(--hl); color: var(--ink); cursor: pointer; min-height: 40px; }
+  .btn.secondary { background: #fff; } .btn:disabled { opacity: .5; cursor: default; }
+  .link { font: inherit; background: none; border: 0; color: #2447a8; text-decoration: underline; cursor: pointer; padding: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  ul { margin: 0; padding-left: 18px; } li { margin: 2px 0; }
+  select, textarea { font: inherit; width: 100%; border: 1.5px solid #C9D3E3; border-radius: 10px; padding: 8px; background: #fff; color: var(--ink); }
+  .ok { color: var(--ok); } .err { color: #a32d2d; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 99px; padding: 1px 9px; background: var(--hl); }
+  .status { position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
+  .answer { border-top: 1px solid var(--rule); padding-top: 6px; }
+  .answer b { display: block; font-size: 13px; }
+</style>
+</head>
+<body>
+<main id="app"><div class="card"><p class="muted">Loading…</p></div></main>
+<script src="sidepanel.js"></script>
+</body>
+</html>
