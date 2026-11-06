@@ -1,6 +1,6 @@
 # Apply: plan in four phases
 
-What this adds to AI Career Coach: an application log that Sky can see and, if the member chooses, coach on, early alerts for new Seek and Indeed jobs that fit, and a browser extension that carries the tailored resume and cover letter into Seek Quick Apply and Indeed Apply with the member clicking Submit.
+What this adds to AI Career Coach: an application log that Sky can see and offer to coach on, early alerts for new Seek and Indeed jobs that fit, and a browser extension that carries the tailored resume and cover letter into Seek Quick Apply and Indeed Apply with the member clicking Submit.
 
 The product already has the hard parts: the resume agent (`api/_py/resume_agent`), the tailor step (`lib/newpage-tailor.js`, `resume_tailor` in `api/newpage/app.js`), the two-pass cover letter writer (`lib/newpage-cover.js`) and Sky with memory and tools (`lib/newpage-coach.js`). Every phase below builds on those patterns and nothing here changes how they write.
 
@@ -9,7 +9,7 @@ Principles that hold through all four phases:
 - Nothing is submitted to an employer by software. A person clicks Apply or Submit every time.
 - Indeed and LinkedIn get autofill only, ever. Seek gets pre-fill with the member on the page. No unattended mode on any board.
 - The server never fetches a Seek, Indeed, Jora or LinkedIn page. Discovery is the licensed Adzuna feed plus what the member sees in their own browser.
-- Fewer, better applications. Sky coaches toward fit and follow-through, not volume, and only when asked.
+- Fewer, better applications. Sky coaches toward fit and follow-through, not volume. It offers the help; the member decides.
 - Member data stays under the member's key where it is personal (same as the resume and "about you" today).
 
 ---
@@ -84,36 +84,63 @@ A member tailors a resume, writes the letter, marks it applied, sees it on Today
 
 ---
 
-## Phase 2: an "Applying" focus for Sky, opt-in (3 to 5 days)
+## Phase 2: Sky offers help with applying (about 1 week)
 
-**Goal.** Members who want help with the applying itself can choose it, the way they choose the Action focus today. Sky does not hold anyone to account unasked. By default Sky can see the pipeline the way it sees tasks, as quiet context, and says nothing about it unless the member brings it up.
+**Goal.** Sky notices when a member is at the applying stage, offers to help with it, and coaches them through it if they say yes. Members rarely know Sky can do this, so Sky brings it up. A no is respected, and Sky may return to it later when the pipeline shows something worth naming. The help itself is person-centred in the Action focus style, never a scorecard.
 
-### Default behaviour (every focus)
+### Stage detection (code, not the model)
 
-`coachSystem` gets one short pipeline line (this week's count, the target if one is set, the open count), built by `lib/newpage-apply.js#pipelineLine`. The Career focus prompt gains one rule: "You can see their applications. Mention them only if they raise applying, ask how they are going, or ask you to log one. Never open with the numbers and never comment on the count unasked." That is the whole default.
+`lib/newpage-apply.js#applyStage` returns one of `not_yet`, `ready`, `applying`, `stalled`, `waiting` from data already in the account:
+
+| Stage | Signal |
+|---|---|
+| `not_yet` | No approved resume |
+| `ready` | An approved resume, or a tailored resume or cover letter made in the last 14 days, and no application logged |
+| `applying` | At least one application logged in the last 14 days |
+| `stalled` | Documents made or alerts opened in the last 14 days but nothing logged for 7 or more days, or nothing logged in the 7 days after a rejection |
+| `waiting` | Applications open and more than 10 days old, nothing new |
+
+The stage and a short pipeline line (this week's count, target if set, open count, last outcome) go into `coachSystem` for every focus.
+
+### The offer
+
+Sky's prompt, Career focus and the other general focuses, gains:
+
+- When the stage is `ready`, `applying`, `stalled` or `waiting` and you have not yet offered, bring it up once, briefly, in your own voice, and ask whether they would like help with the applying side: finding the right ads, getting a tailored resume and letter out the door, or keeping going when it is hard. Tell them in one sentence what you can do (see their applications, help them log and track, talk through what gets in the way, set a weekly rhythm if they want one). Then follow their answer.
+- If they say no, let it go. Save that with `save_memory` ("Does not want help with applying for now, said on <date>").
+- You may raise it again, once, when something has changed: the stage moves to `stalled` or `waiting`, a pattern line appears (below), or they mention applying, rejection or interviews themselves. Name what you noticed in one plain sentence and ask, do not push. If they say no again, stop offering unless they ask.
+- If they say yes, suggest switching to the Applying focus, or just carry on in the current conversation using the same approach.
+
+Whether an offer has been made, and the answer, lives in memory (the existing encrypted `newpage_memory`) so it survives across focuses and sessions and the member can see and delete it in Your context.
+
+### Discoverability outside the chat
+
+- A one-time card on Today when the stage first becomes `ready`: "Sky can help with applying. Track what you send, see what comes back, and talk it through." Buttons: Talk to Sky, Not now.
+- The Applying focus appears in the focus list with the others, so it can be found without being offered.
+- The "Did you apply?" card at the end of the tailor and cover flows (Phase 1) has a line: "Logged applications show up for Sky, so you can talk them through."
 
 ### The Applying focus
 
-A new entry in `COACHES` (`lib/newpage-coaches.js`), sitting next to Action and written in the same register:
+A new entry in `COACHES` (`lib/newpage-coaches.js`), next to Action and in the same register:
 
-- **name** Applying. **blurb** "Finding it hard to apply, or to keep applying." **when** "You have the resume and the ad and still haven't pressed Apply, or you've gone quiet after a rejection." **how** "Looks at your applications with you, asks what's getting in the way, and helps you find your own next step."
-- **prompt**, modelled on Action: person-centred, grounded in self-determination theory, ACT and solution-focused coaching. Never give advice or suggestions. Listen, reflect, ask one question. The pipeline is shared ground, not a scorecard: Sky may name what it shows in one plain sentence ("three applied, nothing back yet, and nothing since the rejection on Tuesday") and then ask how that sits with them. Resistance to applying is the work: fear of rejection, imposter feelings about a stretch role, perfectionism on the letter, avoidance after an interview that went badly. Once the member finds their own next step, offer to add it to their task list. If they want a target, help them choose one that fits their week, then record it; never propose one unasked.
-- **Pattern lines** come from code so they are reliable, and only in this focus: silence for N days after a rejection, the same "missing" requirement across several tailor match tables, saved jobs never moved to applied, several alerts dismissed for the same reason. They go into the prompt as observations Sky may raise, never as instructions to raise them.
-- **Tools**, available in this focus and in Career: `log_application` and `update_application` (only after the member says it happened), `set_weekly_target` (only after they choose one). Added to `COACH_TOOLS` and run through `tools.run` in the `coach` action.
+- **name** Applying. **blurb** "Getting applications out, and keeping going." **when** "You have the resume and the ad and still haven't pressed Apply, you've gone quiet after a rejection, or you want a rhythm." **how** "Looks at your applications with you, asks what's getting in the way, and helps you find your own next step."
+- **prompt**, modelled on Action: person-centred, grounded in self-determination theory, ACT and solution-focused coaching. Avoid advice; listen, reflect, ask one question. The pipeline is shared ground: Sky may name what it shows in one plain sentence and ask how that sits with them. The work is the resistance: fear of rejection, imposter feelings about a stretch role, perfectionism on the letter, avoidance after a bad interview, and the practical side of a weekly rhythm when the member wants one. When they find their own next step, offer to add it to the list. If nothing is being viewed after eight or ten applications, Sky may say so and wonder aloud with them whether the targeting, the Seek Profile or the base resume is the thing to look at, rather than more applications.
+- **Pattern lines**, computed in code and available in every focus (they are also re-offer triggers): silence for N days after a rejection, the same "missing" requirement across several tailor match tables, saved jobs never moved to applied, several alerts dismissed for the same reason, many applications and nothing viewed.
+- **Tools**: `log_application` and `update_application` (after the member says it happened), `set_weekly_target` (after they choose one). Added to `COACH_TOOLS` and run through `tools.run` in the `coach` action. Available in every focus.
 
 ### Check-in email
 
-Off by default. Inside the Applying focus Sky can offer a short Sunday note when the member asks for something to keep them going, and the Applications tool has a switch. The note is one line from Sky in this focus's voice, from `pipelineLine`, with a button to continue the conversation. New cron `api/newpage/applycheck.js`, Sundays around 5pm Sydney, members with the switch on only.
+Offered by Sky in the Applying focus when the member wants something to keep them going, and a switch in the Applications tool. Off until chosen. One line from Sky in the Applying voice from the pipeline line, a button to continue the conversation. New cron `api/newpage/applycheck.js`, Sundays around 5pm Sydney.
 
 ### Tests
 
-- `tests/newpage-apply.test.js`: `pipelineLine`, the pattern detectors with fixture pipelines.
-- `tests/newpage-coach.test.js`: Career focus carries the "only if they raise it" rule; Applying focus carries the never-advise and never-propose-a-target rules; tools present in both.
-- Persona eval (the script on `claude/keen-sagan-rh269f`): "avoiding after rejection" in the Applying focus, and "talking about something else" in Career with a thin pipeline, checking Sky does not bring the numbers up.
+- `tests/newpage-apply.test.js`: `applyStage` for each stage with fixture data; pipeline line; pattern detectors.
+- `tests/newpage-coach.test.js`: the offer rules are in the general prompts; the Applying focus carries the never-propose-a-target-unasked rule; tools present.
+- Persona eval (the script on `claude/keen-sagan-rh269f`): (a) `ready` member talking about something else, Sky offers once and follows their answer; (b) member who said no last week, now `stalled`, Sky names what changed and asks once; (c) `applying` member who accepts, Sky reflects the pipeline once and asks one question.
 
 ### Done when
 
-A member in the Career focus with one application this week hears nothing about it unless they ask. A member who picks Applying hears the pipeline reflected back once, is asked one question, and leaves with their own next step on the list.
+A member who has just approved a resume hears from Sky, once, that it can help with applying. If they decline, the next conversation is about whatever they bring. If they later go quiet after a rejection, Sky mentions it once more and asks. If they accept at any point, they leave the conversation with their own next step on the list.
 
 ## Phase 3: early alerts (about 2 weeks)
 
@@ -269,7 +296,7 @@ A member on a Seek job page sees the fit verdict, picks their tailored resume an
 ## Order and dependencies
 
 ```
-Phase 1 (log)  ──►  Phase 2 (Applying focus)  ──►  Phase 3 (alerts)  ──►  Phase 4 (extension)
+Phase 1 (log)  ──►  Phase 2 (Sky offers)  ──►  Phase 3 (alerts)  ──►  Phase 4 (extension)
                           ▲                     │
                           └── dismiss reasons ──┘
 ```
