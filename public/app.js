@@ -77,14 +77,14 @@ function download(name,data,type="text/calendar"){const url=URL.createObjectURL(
 const $=id=>document.getElementById(id);
 const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const rich=t=>esc(t).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+const rich=t=>esc(t).replace(/^#+\s+/gm,"").replace(/^[ \t]*[-*]\s+/gm,"• ").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
 function h(tag,attrs={},...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k.startsWith("on")&&typeof v==="function")el.addEventListener(k.slice(2),v);else if(v===false||v==null)continue;else if(k==="text")el.textContent=v;else el.setAttribute(k,v===true?"":v);}for(const k of kids.flat(3))if(k!=null&&k!==false)el.append(k);return el;}
 const words=s=>String(s||"").split(/\s+/).filter(Boolean).length;
 const today=()=>new Date().toLocaleDateString("en-CA");
 const addDays=(d,n)=>{const[y,m,dd]=d.split("-").map(Number);return new Date(Date.UTC(y,m-1,dd+n)).toISOString().slice(0,10);};
 const fmtDay=d=>{const[y,m,dd]=d.split("-").map(Number);return new Date(Date.UTC(y,m-1,dd)).toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});};
 const addMin=(t,m)=>{const[a,b]=(t||"10:00").split(":").map(Number);const x=Math.min(a*60+b+Number(m||0),23*60+59);return String(Math.floor(x/60)).padStart(2,"0")+":"+String(x%60).padStart(2,"0");};
-const fmtMoney=n=>n===""||n==null?"":"$"+Number(n).toLocaleString("en-AU");
+const fmtMoney=n=>n===""||n==null?"":n==="?"?"pay still to work out":"$"+Number(n).toLocaleString("en-AU");
 // "I am" + whatever they typed. A leading article is lower-cased, and so is a
 // single capitalised word ("Learner"); multi-word input is left as typed so
 // names and places keep their capitals.
@@ -115,7 +115,7 @@ const blank=()=>({
 });
 let S=blank(), turns=[];
 let aiOn=false, busy=false, ctl=null, sortables=[];
-function save(){store.set(STORE_KEY,JSON.stringify({S,turns}));}
+function save(){store.set(STORE_KEY,JSON.stringify({S,turns}));const sv=$("saved");if(sv&&sv.hidden&&(S.reached>0||S.values.picked.length))sv.hidden=false;}
 function load(){try{const d=JSON.parse(store.get(STORE_KEY)||"null");if(d&&d.S){S=Object.assign(blank(),d.S);S.mix=Object.assign(blank().mix,S.mix||{});if(!Array.isArray(S.mix.trios))S.mix.trios=[];if(!Array.isArray(S.mix.seen))S.mix.seen=[];S.mix.trios.forEach(t=>{if(!Array.isArray(t.added))t.added=[];});turns=Array.isArray(d.turns)?d.turns:[];return true;}}catch{}return false;}
 const topValue=()=>S.values.ranked[0]||"";
 const topIam=()=>S.identity.items[0]?.text||"";
@@ -161,7 +161,7 @@ function setBar(hint,buttons){const hb=$("barhint");hb.textContent=hint||"";hb.c
 function needBtn(label,missing,action){return h("button",{class:"primary",type:"button",onclick:()=>{const m=missing().filter(Boolean);if(m.length){const hb=$("barhint");hb.textContent="Still needed: "+m.join(" · ");hb.classList.add("warn");return;}action();}},label);}
 const AI_ERR={unavailable:"Suggestions aren't switched on for this site.",rate_limited:"Too many requests just now. Try again in a moment.",connection:"Couldn't reach the server. Check your connection and try again.",overloaded:"Claude is very busy right now. Try again in a minute.",refused:"Claude couldn't answer that one. Try again or write your own.",cut_off:"The reply was cut short. Try again.",empty_completion:"Nothing new came back. Try again or write your own.",empty:"Nothing new came back. Try again or write your own.",error:"Something went wrong on our side. Try again in a moment."};
 function aiErr(e){return AI_ERR[e?.code]||"That didn't work. Try again.";}
-function heading(i,title,lead){return[h("span",{class:"kicker",text:`Step ${i+1} of ${STEPS.length}`}),h("h2",{text:title}),lead?h("p",{class:"lead",text:lead}):null].filter(Boolean);}
+function heading(i,title,lead){return[h("span",{class:"kicker",text:`Step ${i+1} of ${STEPS.length}`}),h("h2",{text:title}),lead?h("p",{class:"lead",text:lead}):null,h("button",{class:"linkish talklink",type:"button",onclick:()=>setTab(true)},"Stuck? Talk it through")].filter(Boolean);}
 const rr=()=>{save();renderWork();};
 
 function renderWork(){
@@ -220,9 +220,10 @@ function stepNeeds(w,i){
   const N=S.needs;
   w.append(...heading(i,"What do you need from work?","The practical things a job has to have for it to work in your life."));
   const live=()=>save();
-  const btn=needBtn("Save",()=>[N.pay===""&&"lowest pay",!N.hours&&"hours a week",!N.stress&&"how much stress is OK",!N.mode&&"where you want to work"],()=>finish(i));
+  const btn=needBtn("Save",()=>[N.pay===""&&"lowest pay (or tick not sure yet)",!N.hours&&"hours a week",!N.stress&&"how much stress is OK",!N.mode&&"where you want to work"],()=>finish(i));
   w.append(h("div",{class:"grid2"},
-    h("div",{class:"field"},h("label",{class:"flabel",for:"nPay",text:"Lowest pay I can accept (per year, before tax)"}),h("input",{class:"text",id:"nPay",type:"number",min:0,step:1000,inputmode:"numeric",value:N.pay,placeholder:"e.g. 75000",oninput:e=>{N.pay=e.target.value;live();}})),
+    h("div",{class:"field"},h("label",{class:"flabel",for:"nPay",text:"Lowest pay I can accept (per year, before tax)"}),h("input",{class:"text",id:"nPay",type:"number",min:0,step:1000,inputmode:"numeric",value:N.pay==="?"?"":N.pay,placeholder:"e.g. 75000",disabled:N.pay==="?",oninput:e=>{N.pay=e.target.value;live();}}),
+      h("label",{class:"hint",style:"display:flex;gap:8px;align-items:center"},h("input",{type:"checkbox",checked:N.pay==="?",onchange:e=>{N.pay=e.target.checked?"?":"";rr();}}),"Not sure yet")),
     h("div",{class:"field"},h("label",{class:"flabel",for:"nHrs",text:"Most hours I want to work a week"}),h("input",{class:"text",id:"nHrs",type:"number",min:1,max:80,inputmode:"numeric",value:N.hours,placeholder:"e.g. 38",oninput:e=>{N.hours=e.target.value;live();}}))));
   w.append(h("div",{class:"field"},h("span",{class:"flabel",text:"How much stress is OK?"}),h("div",{class:"opts"},["Low","Some","A lot is fine"].map(v=>h("button",{class:"opt",type:"button","aria-pressed":String(N.stress===v),onclick:()=>{N.stress=v;rr();}},v)))));
   w.append(h("div",{class:"field"},h("span",{class:"flabel",text:"Where do you want to work?"}),h("div",{class:"opts"},["From home","Mix of home and on-site","On-site","Don't mind"].map(v=>h("button",{class:"opt",type:"button","aria-pressed":String(N.mode===v),onclick:()=>{N.mode=v;rr();}},v)))));
@@ -235,15 +236,16 @@ function stepNeeds(w,i){
 function stepStrengths(w,i){
   const G=S.strengths,I=S.sInp;
   w.append(...heading(i,"Your strengths","Three groups: what you know, what you can do, and what you love. At least three in each. More is better."));
-  const cats=[["know","Things I know","Topics, places, cultures, industries, life experience","e.g. Gardening, NDIS, Tamil culture"],["do","Things I can do","Skills, practical or people-based","e.g. Calm people down, fix bikes, write"],["love","Things I love","What makes your heart sing, or your blood boil","e.g. Kids' wellbeing, live music, fairness"],["other","Other things I bring (optional)","People you know, places you can access, things you own","e.g. A big local network, a ute"]];
+  const cats=[["know","Things I know","Topics, places, cultures, industries, life experience","e.g. Gardening, NDIS"],["do","Things I can do","Skills, practical or people-based","e.g. Fix bikes, write"],["love","Things I love","What makes your heart sing, or your blood boil","e.g. Live music, fairness"],["other","Other things I bring (optional)","People you know, places you can access, things you own","e.g. A ute, a big network"]];
   const g=h("div",{class:"grid2"});
   for(const[k,label,hint,ph]of cats){
-    const list=G[k];const add=()=>{const v=I[k].trim();if(!v)return;list.push(v);I[k]="";rr();$("s-"+k)?.focus();};
+    const list=G[k];const add=()=>{const v=I[k].trim();if(!v)return;list.push(v);I[k]="";rr();$("s-"+k)?.focus({preventScroll:true});};
     g.append(h("div",{class:"card"},h("h3",{},label,k!=="other"?h("small",{class:list.length>=3?"met":"",text:`${list.length}/3`}):null),h("span",{class:"hint",text:hint}),
       list.length?h("div",{class:"tags"},list.map((v,j)=>h("span",{class:"tag"},v,h("button",{class:"x",type:"button","aria-label":`Remove ${v}`,onclick:()=>{list.splice(j,1);rr();}},"×")))):null,
       h("div",{class:"addrow"},h("input",{class:"text",id:"s-"+k,value:I[k],placeholder:ph,oninput:e=>{I[k]=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();add();}}}),h("button",{class:"small",type:"button",onclick:add},"Add"))));
   }
   w.append(g);
+  if(S.mix.trios.length)w.append(h("p",{class:"hint",text:"Anything you add here gets mixed in when you press Remix on the Mix ideas step."}));
   const ok=G.know.length>=3&&G.do.length>=3&&G.love.length>=3;
   setBar(ok?"Ready to mix":"At least 3 in each of the first three groups",[needBtn("Save my strengths",()=>[G.know.length<3&&`${3-G.know.length} more thing${3-G.know.length===1?"":"s"} you know`,G.do.length<3&&`${3-G.do.length} more thing${3-G.do.length===1?"":"s"} you can do`,G.love.length<3&&`${3-G.love.length} more thing${3-G.love.length===1?"":"s"} you love`],()=>finish(i))]);
 }
@@ -254,7 +256,11 @@ function stepMix(w,i){
   if(M.trios.some(t=>!G.know.includes(t.know)||!G.do.includes(t.do)||!G.love.includes(t.love)))M.trios=[];
   if(!M.trios.length){M.trios=makeTrios(G,M.seen);M.seen.push(...M.trios.map(ckey));save();}
   const answered=M.trios.filter(t=>t.added.length).length;
-  w.append(h("div",{class:"sugg"},M.trios.map((t,j)=>{
+  const addHad=()=>{const t=M.had.trim();if(!t)return;M.ideas.push({title:t,source:"Already had"});M.had="";rr();$("mHad")?.focus({preventScroll:true});};
+  w.append(h("div",{class:"card"},h("h3",{text:"Ideas you already had"}),h("span",{class:"hint",text:"Any job or career you've thought about before, even years ago. Bank them first."}),
+    h("div",{class:"addrow"},h("input",{class:"text",id:"mHad",value:M.had,placeholder:"e.g. Paramedic, opening a café",oninput:e=>{M.had=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();addHad();}}}),h("button",{class:"small",type:"button",onclick:addHad},"Add"))));
+  const shown=M.showAll?M.trios:M.trios.slice(0,5);
+  w.append(h("div",{class:"sugg"},shown.map((t,j)=>{
     const id="trio"+j;
     const add=()=>{const v=t.idea.trim();if(!v)return;M.ideas.push({title:v,source:"Your mix",trio:[t.know,t.do,t.love]});t.added.push(v);t.idea="";save();renderWork();setTimeout(()=>$(id)?.focus(),0);};
     return h("div",{class:"card mixcard"},
@@ -267,17 +273,18 @@ function stepMix(w,i){
         catch(e){st.textContent=aiErr(e);}b.disabled=false;}},"Suggest an idea for this mix");return h("div",{class:"airow"},b,st);})():null,
       h("div",{class:"addrow"},h("input",{class:"text",id,value:t.idea,placeholder:t.added.length?"Another idea?":"What job or work could this be?","aria-label":`Idea for mix ${j+1}`,oninput:e=>{t.idea=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();add();}}}),h("button",{class:"small",type:"button",onclick:add},"Add")));
   })));
-  w.append(h("div",{class:"addrow",style:"align-items:center;flex-wrap:wrap"},h("span",{class:"hint",text:`${answered} of ${M.trios.length} mixes answered.`}),h("button",{class:"small alt",type:"button",onclick:()=>{M.trios=makeTrios(G,M.seen);M.seen.push(...M.trios.map(ckey));save();renderWork();$("wscroll").scrollTop=0;}},"Remix: 10 new mixes")));
-  const addHad=()=>{const t=M.had.trim();if(!t)return;M.ideas.push({title:t,source:"Already had"});M.had="";rr();$("mHad")?.focus();};
-  w.append(h("div",{class:"card"},h("h3",{text:"Ideas you already had"}),h("span",{class:"hint",text:"Any job or career you've thought about before, even years ago."}),
-    h("div",{class:"addrow"},h("input",{class:"text",id:"mHad",value:M.had,placeholder:"e.g. Paramedic, opening a café",oninput:e=>{M.had=e.target.value;save();},onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();addHad();}}}),h("button",{class:"small",type:"button",onclick:addHad},"Add"))));
+  // Remix keeps anything typed but not yet added, so nothing is lost.
+  const remix=()=>{M.trios.forEach(t=>{const v=t.idea.trim();if(v&&!t.added.includes(v)){M.ideas.push({title:v,source:"Your mix",trio:[t.know,t.do,t.love]});t.added.push(v);}});M.trios=makeTrios(G,M.seen);M.seen.push(...M.trios.map(ckey));M.showAll=false;save();renderWork();$("wscroll").scrollTop=0;};
+  w.append(h("div",{class:"addrow",style:"align-items:center;flex-wrap:wrap"},h("span",{class:"hint",text:`${answered} of ${M.trios.length} mixes answered.`}),
+    !M.showAll&&M.trios.length>5?h("button",{class:"small alt",type:"button",onclick:()=>{M.showAll=true;rr();}},`Show ${M.trios.length-5} more`):null,
+    h("button",{class:"small alt",type:"button",onclick:remix},"Remix: 10 new mixes")));
   // Claude suggestions
   const sbox=h("div",{class:"card"},h("h3",{text:"More ideas from Claude"}),h("span",{class:"hint",text:"Claude mixes your strengths into a few more ideas. Keep the ones you like."}));
   const status=h("span",{class:"hint"});
   const sBtn=h("button",{class:"small alt",type:"button",disabled:!aiOn,onclick:()=>suggest(sBtn,status)},M.suggestions.length?"Suggest a few more":"Suggest ideas");
   sbox.append(h("div",{class:"addrow",style:"align-items:center"},sBtn,status));
   if(!aiOn)status.textContent="Not switched on for this site.";
-  if(M.suggestions.length)sbox.append(h("div",{class:"sugg"},M.suggestions.map((s,j)=>h("div",{class:"idea"},h("b",{text:s.title}),h("button",{class:"small alt",type:"button",onclick:()=>{M.ideas.push({title:s.title,source:"Suggested",trio:[s.know,s.do,s.love],why:s.why});M.suggestions.splice(j,1);rr();}},"Keep"),h("span",{class:"why",text:[s.know,s.do,s.love].filter(Boolean).join(" + ")+(s.why?` · ${s.why}`:"")})))));
+  if(M.suggestions.length)sbox.append(h("div",{class:"sugg"},M.suggestions.map((s,j)=>h("div",{class:"idea"},h("b",{text:s.title}),h("span",{class:"acts"},h("button",{type:"button",onclick:()=>{M.ideas.push({title:s.title,source:"Suggested",trio:[s.know,s.do,s.love],why:s.why});M.suggestions.splice(j,1);rr();}},"Keep"),h("button",{type:"button","aria-label":`Dismiss ${s.title}`,onclick:()=>{M.suggestions.splice(j,1);rr();}},"No thanks")),h("span",{class:"why",text:[s.know,s.do,s.love].filter(Boolean).join(" + ")+(s.why?` · ${s.why}`:"")})))));
   w.append(sbox);
   // list
   w.append(h("div",{class:"card"},h("h3",{},"My ideas",h("small",{text:String(M.ideas.length)})),M.ideas.length?h("div",{class:"sugg"},M.ideas.map((d,j)=>h("div",{class:"idea"},h("b",{text:d.title}),h("button",{class:"x",type:"button","aria-label":`Remove ${d.title}`,onclick:()=>{M.ideas.splice(j,1);rr();}},"×"),h("span",{class:"why"},h("span",{class:"src",text:d.source.toUpperCase()}),d.trio?" · "+d.trio.join(" + "):"")))):h("p",{class:"empty",text:"Your ideas will collect here."})));
@@ -385,16 +392,20 @@ function ics(list){
   const x=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
   const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
   const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Purposefields//Compass//EN","CALSCALE:GREGORIAN"];
-  list.forEach((e,k)=>{const d=e.date.replace(/-/g,"");L.push("BEGIN:VEVENT",`UID:${Date.now()}-${k}@purposefields`,`DTSTAMP:${stamp}`,`DTSTART;TZID=${TZ}:${d}T${e.start.replace(":","")}00`,`DTEND;TZID=${TZ}:${d}T${e.end.replace(":","")}00`,`SUMMARY:${x(e.title)}`,`DESCRIPTION:${x(e.details)}`,"BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:-PT15M",`DESCRIPTION:${x(e.title)}`,"END:VALARM","END:VEVENT");});
+  const utc=(date,time)=>{const[y,m,d]=date.split("-").map(Number),[hh,mm]=time.split(":").map(Number);return new Date(y,m-1,d,hh,mm).toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");};
+  list.forEach((e,k)=>{L.push("BEGIN:VEVENT",`UID:${Date.now()}-${k}@purposefields`,`DTSTAMP:${stamp}`,`DTSTART:${utc(e.date,e.start)}`,`DTEND:${utc(e.date,e.end)}`,`SUMMARY:${x(e.title)}`,`DESCRIPTION:${x(e.details)}`,"BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:-PT15M",`DESCRIPTION:${x(e.title)}`,"END:VALARM","END:VEVENT");});
   L.push("END:VCALENDAR");return L.join("\r\n");
 }
 async function copyText(t,btn){const old=btn.textContent;try{await navigator.clipboard.writeText(t);btn.textContent="Copied";}catch{btn.textContent="Couldn't copy";}setTimeout(()=>{btn.textContent=old;},1600);}
 function saveFile(name,data,btn){const old=btn.textContent;try{download(name,data);btn.textContent="Saved";}catch{btn.textContent="Couldn't save";}setTimeout(()=>{btn.textContent=old;},1600);}
 function summaryText(){
-  const L=[`MY COMPASS MAP`,``,`Values (in order): ${S.values.ranked.join(", ")}`,``,`I am (in order):`,...S.identity.items.map((x,k)=>`${k+1}. ${x.text}`),``,`My North Star:`,S.north,``,`What I need from work: at least ${fmtMoney(S.needs.pay)} a year, up to ${S.needs.hours} hours a week, ${S.needs.stress.toLowerCase()} stress, ${S.needs.mode.toLowerCase()}${S.needs.location?`, ${S.needs.location}`:""}${S.needs.other?`. ${S.needs.other}`:""}`,``,`I know: ${S.strengths.know.join(", ")}`,`I can do: ${S.strengths.do.join(", ")}`,`I love: ${S.strengths.love.join(", ")}`,...(S.strengths.other.length?[`I also bring: ${S.strengths.other.join(", ")}`]:[]),``,`My ideas: ${S.mix.ideas.map(d=>d.title).join(", ")}`,``,`Top pick: ${S.choose.first}${S.choose.second?`\nSecond: ${S.choose.second}`:""}`,``,`Plan`,`Now: ${S.plan.now}`,`Building: ${S.plan.building}`,`Making the move: ${S.plan.move}`,`Longer term: ${S.plan.longer}`,``,`First steps`,...S.actions.map((a,k)=>`${k+1}. ${a} — ${fmtDay(S.sched[k].date)}, ${S.sched[k].start}`)];
+  const L=[`MY COMPASS MAP`,``,`Values (in order): ${S.values.ranked.join(", ")}`,``,`I am (in order):`,...S.identity.items.map((x,k)=>`${k+1}. ${x.text}`),``,`My North Star:`,S.north,``,`What I need from work: ${needsLine()}`,``,`I know: ${S.strengths.know.join(", ")}`,`I can do: ${S.strengths.do.join(", ")}`,`I love: ${S.strengths.love.join(", ")}`,...(S.strengths.other.length?[`I also bring: ${S.strengths.other.join(", ")}`]:[]),``,`My ideas: ${S.mix.ideas.map(d=>d.title).join(", ")}`,``,`Top pick: ${S.choose.first}${S.choose.second?`\nSecond: ${S.choose.second}`:""}`,``,`Plan`,`Now: ${S.plan.now}`,`Building: ${S.plan.building}`,`Making the move: ${S.plan.move}`,`Longer term: ${S.plan.longer}`,``,`First steps`,...S.actions.map((a,k)=>`${k+1}. ${a} — ${fmtDay(S.sched[k].date)}, ${S.sched[k].start}`)];
   return L.join("\n");
 }
+function needsLine(){const N=S.needs;return [N.pay==="?"?fmtMoney("?"):N.pay!==""?`at least ${fmtMoney(N.pay)} a year`:"",N.hours?`up to ${N.hours} hours a week`:"",N.stress?`${N.stress.toLowerCase()} stress`:"",N.mode?N.mode.toLowerCase():"",N.location].filter(Boolean).join(", ")+(N.other?`. ${N.other}`:"");}
 function renderSummary(w){
+  // Ideas may have been reordered or removed since Choose; the top pick follows the list.
+  S.choose.first=S.mix.ideas[0]?.title||S.choose.first;S.choose.second=S.mix.ideas[1]?.title||"";
   w.append(h("span",{class:"kicker",text:"Done"}),h("h2",{text:"Your Compass map"}),h("p",{class:"lead",text:"Everything you worked out, in one place. Your first steps are ready to add to your calendar."}));
   const sec=(t,...kids)=>h("div",{class:"sum"},h("h3",{text:t}),...kids);
   const evts=S.actions.map((_,j)=>evt(j));
@@ -402,18 +413,21 @@ function renderSummary(w){
     h("div",{class:"acts"},h("button",{type:"button",onclick:ev=>saveFile("compass-first-steps.ics",ics(evts),ev.currentTarget)},"Download all three"))));
   w.append(sec("Top pick",h("p",{style:"font-size:20px;font-weight:600",text:S.choose.first}),S.choose.second?h("p",{class:"hint",text:`Second: ${S.choose.second}`}):null));
   w.append(sec("North Star",h("p",{class:"ns",text:S.north})));
+  w.append(sec("What I need",h("p",{text:needsLine()})));
   w.append(sec("Values",h("p",{text:S.values.ranked.map((v,k)=>`${k+1}. ${v}`).join("\n"),style:"white-space:pre-line"})));
   w.append(sec("I am",h("p",{text:S.identity.items.map((x,k)=>`${k+1}. ${x.text}`).join("\n"),style:"white-space:pre-line"})));
   w.append(sec("Plan",...[["Now",S.plan.now],["Building",S.plan.building],["Making the move",S.plan.move],["Longer term",S.plan.longer]].filter(([,v])=>v).map(([k,v])=>h("p",{},h("b",{text:k+": "}),v))));
   w.append(sec("Strengths",h("p",{},h("b",{text:"I know: "}),S.strengths.know.join(", ")),h("p",{},h("b",{text:"I can do: "}),S.strengths.do.join(", ")),h("p",{},h("b",{text:"I love: "}),S.strengths.love.join(", "))));
-  setBar("Edit any step from the strip at the top.",[h("button",{class:"secondary",type:"button",onclick:()=>{S.editCal=true;rr();$("wscroll").scrollTop=0;}},"Change days or times"),h("button",{class:"primary",type:"button",onclick:ev=>copyText(summaryText(),ev.currentTarget)},"Copy my map")]);
+  setBar("Edit any step from the strip at the top.",[h("button",{class:"secondary",type:"button",onclick:()=>{S.editCal=true;rr();$("wscroll").scrollTop=0;}},"Change days or times"),h("button",{class:"secondary",type:"button",onclick:ev=>{const b=ev.currentTarget,old=b.textContent;try{download("my-compass-map.txt",summaryText(),"text/plain");b.textContent="Saved";}catch{b.textContent="Couldn't save";}setTimeout(()=>{b.textContent=old;},1600);}},"Download as text"),h("button",{class:"primary",type:"button",onclick:ev=>copyText(summaryText(),ev.currentTarget)},"Copy my map")]);
 }
 
 /* ================= chat ================= */
 function addMsg(role,text){
   if(role==="divider"){const d=h("div",{class:"divider",text});$("log").append(d);return{};}
   const b=h("div",{class:"bubble"});if(role==="me")b.textContent=text;else b.innerHTML=rich(text);
-  const m=h("div",{class:"msg"+(role==="me"?" me":"")},b);$("log").append(m);scrollDown();return{m,b};
+  const m=h("div",{class:"msg"+(role==="me"?" me":"")},b);$("log").append(m);scrollDown();
+  if(role==="ai"&&booted&&!document.body.classList.contains("talk"))$("tabTalk").classList.add("unread");
+  return{m,b};
 }
 function scrollDown(){const s=$("chatlog");s.scrollTop=s.scrollHeight;}
 function context(){
@@ -421,7 +435,7 @@ function context(){
   const snap={values_in_order:S.values.ranked.length?S.values.ranked:S.values.picked,i_am_in_order:S.identity.items.map(x=>x.text),north_star:S.north,needs:S.needs,strengths:S.strengths,ideas:S.mix.ideas.map(d=>d.title),top_pick:S.choose.first,second:S.choose.second,plan:S.plan,first_steps:S.actions};
   return `[Where they are] Step ${S.step+1} of ${STEPS.length}: ${st.label}. ${INTROS[st.key].replace(/\*\*/g,"")}\nTheir answers so far: ${JSON.stringify(snap)}`;
 }
-const ERR={unavailable:"Chat isn't switched on for this site.",rate_limited:"Too many messages just now. Wait a moment, then try again.",overloaded:"Claude is very busy right now. Try again in a minute.",connection:"Couldn't reach the server. Check your connection and send again.",refused:"Claude couldn't answer that. Try saying it another way.",empty_completion:"No reply came back. Try again.",prompt_too_large:"This chat has grown too long. Press Start over to begin a fresh one (your answers will be cleared).",cut_off:"The reply was cut short. Try again.",error:"Something went wrong on our side. Try again in a moment."};
+const ERR={unavailable:"Chat isn't switched on for this site.",rate_limited:"Too many messages just now. Wait a moment, then try again.",overloaded:"Claude is very busy right now. Try again in a minute.",connection:"Couldn't reach the server. Check your connection and send again.",refused:"Claude couldn't answer that. Try saying it another way.",empty_completion:"No reply came back. Try again.",prompt_too_large:"This chat has grown too long. Clear the chat to start a fresh one. Your answers in the steps are kept.",cut_off:"The reply was cut short. Try again.",error:"Something went wrong on our side. Try again in a moment."};
 function setBusy(b){busy=b;const btn=$("sendBtn");btn.classList.toggle("stop",b);btn.textContent=b?"Stop":"Send";btn.disabled=b?false:(!aiOn||!$("box").value.trim());}
 async function send(text){
   text=(text||"").trim();if(!text||busy)return;
@@ -444,13 +458,16 @@ async function send(text){
       // history (otherwise it's resent forever) and put the words back to edit or resend.
       if(turns.at(-1)?.role==="user"&&turns.at(-1).content===text){turns.pop();mine.remove();}
       if(e?.code!=="cancelled"&&!box.value.trim()){box.value=text;box.dispatchEvent(new Event("input"));}}
-    if(e?.code!=="cancelled"){const note=h("div",{class:"note",text:ERR[e?.code]||"The connection dropped. Try sending again."});if(m.isConnected)m.append(note);else $("log").append(note);}
+    if(e?.code!=="cancelled"){const note=h("div",{class:"note",text:ERR[e?.code]||"The connection dropped. Try sending again."});if(e?.code==="prompt_too_large")note.append(" ",h("button",{class:"linkish",type:"button",onclick:clearChat},"Clear chat"));if(m.isConnected)m.append(note);else $("log").append(note);}
   }
   save();setBusy(false);scrollDown();
 }
 
 /* ================= wiring ================= */
 function renderAll(){renderSteps();renderWork();}
+let booted=false;
+// Start the conversation again without touching the answers in the steps.
+function clearChat(){ctl?.abort();turns=[];const k=STEPS[S.step].key;turns.push({role:"assistant",content:INTROS[k],intro:k});save();$("log").innerHTML="";addMsg("divider",STEPS[S.step].label);addMsg("ai",INTROS[k]);}
 // Keep Tab inside an open dialog, and let Escape close the ones that may be closed.
 function trapFocus(dlg,onEscape){dlg.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&onEscape){e.preventDefault();onEscape();return;}
@@ -466,7 +483,7 @@ const cks=["c1","c2","c3","c4"].map($);
 cks.forEach(c=>c.addEventListener("change",()=>{$("consentGo").disabled=!cks.every(x=>x.checked);}));
 $("consentGo").onclick=()=>{store.set(CONSENT_KEY,JSON.stringify({timestamp:Date.now()}));$("consent").hidden=true;};
 $("consentHelp").onclick=openCrisis;
-try{const c=JSON.parse(store.get(CONSENT_KEY)||"null");if(!c||(Date.now()-c.timestamp)/864e5>=90)$("consent").hidden=false;}catch{$("consent").hidden=false;}
+try{const c=JSON.parse(store.get(CONSENT_KEY)||"null");if(!c||(Date.now()-c.timestamp)/864e5>=90){$("consent").hidden=false;if(c)$("consentLead").textContent="It's been a while, so here's a reminder of how The Compass works. Tick each one to continue.";}}catch{$("consent").hidden=false;}
 if(!$("consent").hidden)$("c1").focus();
 
 const box=$("box");
@@ -474,7 +491,7 @@ box.addEventListener("input",()=>{box.style.height="auto";box.style.height=Math.
 box.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}});
 function go(){const t=box.value;if(!t.trim()||busy||!aiOn)return;box.value="";box.style.height="auto";$("sendBtn").disabled=true;send(t);}
 $("sendBtn").onclick=()=>{if(busy){ctl?.abort();return;}go();};
-function setTab(talk){document.body.classList.toggle("talk",talk);$("tabWork").setAttribute("aria-selected",String(!talk));$("tabTalk").setAttribute("aria-selected",String(talk));if(talk)scrollDown();}
+function setTab(talk){document.body.classList.toggle("talk",talk);if(talk)$("tabTalk").classList.remove("unread");$("tabWork").setAttribute("aria-selected",String(!talk));$("tabTalk").setAttribute("aria-selected",String(talk));if(talk)scrollDown();}
 $("tabWork").onclick=()=>setTab(false);$("tabTalk").onclick=()=>setTab(true);
 
 let armed=null;
@@ -486,7 +503,7 @@ function boot(){
   if(!turns.length)turns.push({role:"assistant",content:INTROS.values,intro:"values"});
   $("log").innerHTML="";
   for(const t of turns){if(t.intro){addMsg("divider",STEPS.find(s=>s.key===t.intro)?.label||"");}addMsg(t.role==="user"?"me":"ai",t.content);}
-  renderAll();save();
+  renderAll();save();booted=true;
 }
 load();boot();
 

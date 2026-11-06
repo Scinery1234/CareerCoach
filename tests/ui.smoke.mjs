@@ -71,16 +71,26 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   await check("north star, needs, strengths", async () => {
     await page.fill("#nsText", "I am outside in the garden with my kids most days, calm and unhurried, teaching people how to grow their own food and feeling useful.");
     await page.click("text=Save my North Star");
-    await page.fill("#nPay", "60000");
+    await page.check("input[type=checkbox]"); // not sure about pay yet
     await page.fill("#nHrs", "30");
     await page.click(".opt:has-text('Low')");
-    await page.click(".opt:has-text('On-site')");
+    await page.locator(".opt", { hasText: /^On-site$/ }).click();
     await page.click("#barbtns >> text=Save");
     await addTo("s-know", ["Gardening", "Permaculture", "Soil"]);
     await addTo("s-do", ["Teach", "Fix things", "Listen"]);
     await addTo("s-love", ["Kids", "Being outside", "Fairness"]);
     await page.click("text=Save my strengths");
     assert.equal(await h2(), "Mix and match");
+  });
+
+  await check("mix shows five, then five more; Remix keeps a typed idea", async () => {
+    assert.equal(await page.locator(".mixcard").count(), 5);
+    await page.click("text=Show 5 more");
+    assert.equal(await page.locator(".mixcard").count(), 10);
+    await page.fill("#trio1", "Typed but not added");
+    await page.click("text=Remix: 10 new mixes");
+    assert.equal(await page.locator(".mixcard").count(), 5);
+    assert.match(await page.locator("#wbody").innerText(), /Typed but not added/);
   });
 
   await check("mix, choose, plan, steps", async () => {
@@ -107,9 +117,14 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     assert.equal(await h2(), "Your Compass map");
   });
 
-  await check("summary lists values one per line", async () => {
+  await check("summary lists values one per line and shows what I need", async () => {
     const txt = await page.locator(".sum:has(h3:text('Values')) p").innerText();
     assert.match(txt, /1\. Calm\n2\. Care/);
+    const need = await page.locator(".sum:has(h3:text('What I need')) p").innerText();
+    assert.equal(need, "pay still to work out, up to 30 hours a week, low stress, on-site");
+    assert.equal(await page.locator("text=Download as text").count(), 1);
+    const saved = await page.evaluate(() => { const e = document.getElementById("saved"); return !e.hidden && e.getBoundingClientRect().height > 0; });
+    assert.equal(saved, true, "Saved on this device is shown");
   });
 
   await check("re-saving an earlier step returns to the map, not the next step", async () => {
@@ -120,7 +135,11 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   });
 
   await check("Enter does not post a chat message when AI is off", async () => {
-    if (viewport.width < 900) await page.click("#tabTalk");
+    if (viewport.width < 900) {
+      assert.ok(await page.locator("#tabTalk.unread").count(), "unread dot after step intros arrived");
+      await page.click("#tabTalk");
+      assert.equal(await page.locator("#tabTalk.unread").count(), 0);
+    }
     await page.fill("#box", "hello there");
     await page.press("#box", "Enter");
     assert.equal(await page.locator(".msg.me").count(), 0);
