@@ -1,0 +1,109 @@
+import Stripe from 'stripe'
+import { supabase } from '../../lib/supabase.js'
+import { sendConfirmation } from '../../lib/resend.js'
+import { createOutlookEvent } from '../../lib/outlook.js'
+import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
+import { applyCheckout, applyInvoicePaid, applySubscriptionEnded, applySubscriptionUpdated, applyTrialWillEnd, applyPaymentFailed } from '../../lib/newpage-payments.js'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+
+export const config = { api: { bodyParser: false } }
+
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    req.on('data', chunk => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end()
+
+  const sig = req.headers['stripe-signature']
+  const rawBody = await getRawBody(req)
+
+  let event
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)
+  } catch {
+    return res.status(400).json({ error: 'Webhook signature verification failed' })
+  }
+
+  // AI Career Coach payments (join, renewal, extra hours) come through Stripe Checkout.
+  if (event.type === 'checkout.session.completed') {
+    try {
+      await applyCheckout(event.data.object)
+    } catch (err) {
+      console.error('AI Career Coach payment failed:', err)
+      return res.status(500).json({ error: 'Could not apply the payment' }) // Stripe will retry
+    }
+    return res.json({ received: true })
+  }
+
+  // The $25-a-month tools membership: later months, cancellations.
+  if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.trial_will_end') {
+    try {
+      if (event.type === 'invoice.paid') await applyInvoicePaid(event.data.object)
+      else if (event.type === 'invoice.payment_failed') await applyPaymentFailed(event.data.object)
+      else if (event.type === 'customer.subscription.trial_will_end') await applyTrialWillEnd(event.data.object)
+      else if (event.type === 'customer.subscription.deleted') await applySubscriptionEnded(event.data.object)
+      else await applySubscriptionUpdated(event.data.object)
+    } catch (err) {
+      console.error('Subscription event failed:', err)
+      return res.status(500).json({ error: 'Could not apply the subscription event' })
+    }
+    return res.json({ received: true })
+  }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const intent = event.data.object
+    // Checkout payments for AI Career Coach have no booking. Nothing to do here.
+    if (intent.metadata?.kind?.startsWith('newpage_')) return res.json({ received: true })
+
+    // A package stamps the same intent on every booking in it, so there can be several rows.
+    const { data: rows } = await supabase
+      .from('bookings')
+      .select('*, session_types(name), clients(*)')
+      .eq('stripe_payment_intent_id', intent.id)
+      .order('date', { ascending: true })
+
+    // Nothing to confirm (or already confirmed on an earlier delivery): acknowledge so Stripe stops retrying.
+    const pending = (rows || []).filter(b => b.status !== 'confirmed')
+    if (!rows?.length || !pending.length) return res.json({ received: true })
+    const booking = pending[0]
+
+    await supabase.from('bookings')
+      .update({ status: 'confirmed' })
+      .eq('stripe_payment_intent_id', intent.id)
+
+    await supabase.from('clients')
+      .update({ status: 'active', primary_service: booking.session_types.name })
+      .eq('id', booking.client_id)
+
+    // Activate package if this payment is for one
+    if (intent.metadata?.packageId) {
+      await supabase.from('packages')
+        .update({ status: 'active', sessions_used: 1 })
+        .eq('id', intent.metadata.packageId)
+    }
+
+    const confirmedBooking = { ...booking, session_type_name: booking.session_types.name }
+    const sessionsTotal = intent.metadata?.sessionsTotal ? parseInt(intent.metadata.sessionsTotal) : 1
+    const recurDates = pending.length > 1 ? pending.map(b => b.date) : null
+    await Promise.all([
+      sendConfirmation({ booking: confirmedBooking, client: booking.clients, zoomLink: booking.meet_link, sessionsTotal, recurDates }),
+      ...pending.map(b => createOutlookEvent({ booking: { ...confirmedBooking, date: b.date, id: b.id }, client: booking.clients, meetLink: booking.meet_link })),
+      ...pending.map(b => createGoogleCalendarEvent({ booking: { ...confirmedBooking, date: b.date, id: b.id }, client: booking.clients, meetLink: booking.meet_link }))
+    ])
+  }
+
+  if (event.type === 'payment_intent.payment_failed') {
+    await supabase.from('bookings')
+      .update({ status: 'pending' })
+      .eq('stripe_payment_intent_id', event.data.object.id)
+  }
+
+  res.json({ received: true })
+}

@@ -1,42 +1,64 @@
-# The Compass by Purposefields
+# AI Career Coach (aicareercoach.net)
 
-A guided, ten-step career-direction tool for everyday people, with an AI thinking partner ("Talk it through") powered by Claude.
+Sky, an AI career coach that remembers you, with the tools around it (resume writer and tailoring, cover letter writer, the Compass, LinkedIn and outreach writers, planner, notes, a career direction report), sold as a $25-a-month membership. Members can add paid 60-minute online sessions with a human career coach, booked from inside the app. By Purposefields.
 
-The steps are: Values → Who I am → North Star → What I need → Strengths → Mix ideas → Choose → Plan → First steps → Calendar. The last screen gives a one-page map plus Google Calendar links and `.ics` downloads for the three first steps.
+This branch is a standalone product. It carries the Sky and tools stack from the New Page program (the `vikashan` repo) with the four-week program, the quiz funnel and the scholarship path removed, and the human coach sold by the hour instead of included. `main` still holds The Compass, the earlier standalone tool.
 
-## Run it
-
-Requires Node.js 20+.
-
-```bash
-npm install
-cp .env.example .env        # then add your ANTHROPIC_API_KEY
-npm run dev                 # http://localhost:3000 (reloads on change, reads .env)
-```
-
-In production, set the environment variables yourself and run `npm start`. Or use Docker:
-
-```bash
-docker build -t compass .
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-... compass
-```
-
-If `ANTHROPIC_API_KEY` isn't set, the app still works end to end. Only the chat and the "Suggest…" buttons are switched off.
-
-## How it's built
+## What's here
 
 | Path | What it does |
 |---|---|
-| `server.js` | Express server: static files, security headers, `/api/chat` (streams NDJSON), `/api/suggest/:kind`, per-IP rate limit |
-| `lib/prompts.js` | The Compass guide (system prompt), the four suggestion prompts and their JSON schemas |
-| `lib/claude.js` | Calls Claude through the Anthropic SDK. Chat streams; suggestions use structured JSON output |
-| `public/` | The app itself: plain HTML, CSS and JS, no build step. SortableJS is served from `node_modules` |
-| `tests/` | `npm test` runs end-to-end API tests against a mock Anthropic server (no key needed) |
+| `index.html` | The landing page the ads point at. `/join` pays, `/demo` is the no-sign-up demo. |
+| `app/` | The member app: Today, Coach (Sky), Tools, Me. Plain HTML, CSS and JS, no build step. |
+| `join/`, `demo/`, `memory/`, `admin/` | Paying, the demo, the memory page linked from retention emails, and the admin (members, demo feedback, the content editor, "Is everything working?"). `admin/bookings.html` manages the human coach's availability and bookings. |
+| `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`. |
+| `api/newpage/resume.py`, `docx.py`, `api/_py/` | Python: the resume agent, the Word builders, usage limits. |
+| `api/bookings`, `api/availability.js`, `api/session-types.js`, `api/admin/*` | The booking engine for sessions with the human coach. |
+| `api/webhooks/stripe.js` | Stripe: membership paid, renewed, cancelled; sessions bought. |
+| `lib/` | Everything shared: Sky's prompts and principles, memory encryption, usage caps, emails, Stripe. |
+| `content/` | The program content modules Sky and the content editor still reference. The program itself is not sold here. |
+| `sql/` | Supabase schema: `schema.sql` (bookings) then `newpage.sql` (members, docs, memory, usage). |
+| `tests/` | `npm test` (Node) and `python3 -m unittest discover -s tests/py`. |
 
-Notes:
+## Deploy
 
-- **Prompts stay on the server.** The browser can ask only for the chat or for one of the four suggestion types (`mixIdea`, `ideas`, `plan`, `steps`). It can't send its own prompt, and the API key never reaches the browser.
-- **Answers are stored in the browser** (`localStorage`) until the person presses Start over. The server doesn't store anything. It passes what the person wrote to Claude when they chat or ask for a suggestion, and the consent screen says so.
-- **Safety.** Crisis keywords open the support dialog (Australian services) on the client. The guide prompt also tells Claude to step out of the career conversation and share the same services.
-- **Models.** The default is `claude-opus-5-5` (effort `low` for chat, `medium` for suggestions) and `claude-haiku-5-5` for the quick single-mix idea. Change them with `COMPASS_MODEL` / `COMPASS_QUICK_MODEL`. Server-side refusal fallback (`fallbacks: "default"`) is on for non-Haiku models; turn it off with `COMPASS_FALLBACKS=off`.
-- **Rate limit.** 20 AI requests per IP per minute by default (`RATE_LIMIT_PER_MIN`). The limit is kept in memory, so it covers a single instance only. Set `TRUST_PROXY` when you run behind a reverse proxy.
+1. **Vercel.** New project from this repo, production branch set to this branch. Root is the repo. Python functions need the Python runtime (Vercel picks it up from the `.py` files).
+2. **Supabase.** New project. Run `sql/schema.sql`, then `sql/newpage.sql`, in the SQL editor.
+3. **Stripe.** A webhook to `https://aicareercoach.net/api/webhooks/stripe` for `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end`. Turn on the Customer Portal (Settings, Billing, Customer portal).
+4. **Resend.** Verify `aicareercoach.net` and set `FROM_EMAIL` on it.
+5. **Environment variables** (Vercel, Production):
+
+| Variable | What |
+|---|---|
+| `NEXT_PUBLIC_URL` | `https://aicareercoach.net` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY` | From the Supabase project |
+| `JWT_SECRET` | Long random string; signs member and admin sessions |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` | Admin sign-in. Hash with `npm run generate-hash -- 'your password'` |
+| `ANTHROPIC_API_KEY` | Sky and the writers |
+| `NEWPAGE_WRITER_MODEL`, `RESUME_MODEL` | Optional. `claude-sonnet-5-5` keeps the writers cheap; default is Opus |
+| `TRIAL_DAYS` | Free trial on the membership, card taken at checkout. Default 7; 0 switches it off and the pages say $25 a month |
+| `NEWPAGE_MEMORY_KEY` | 32 random bytes, base64. Encrypts Sky's memory. `openssl rand -base64 32` |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | From Stripe |
+| `RESEND_API_KEY`, `FROM_EMAIL`, `FROM_NAME` | Email |
+| `CRON_SECRET` | Vercel sets this for crons |
+| `GOOGLE_*` | Optional: the human coach's Google Calendar, for busy times and invites (see `lib/google-calendar.js`) |
+
+6. In the admin, press **Is everything working?** It checks every table, column, key and service and names what's missing.
+
+## The landing page and ads
+
+`index.html` is the page ads land on. It carries one message, one button and the product drawn in HTML, with proof next to the button and the objections answered under it. Each ad angle has its own headline: send traffic to `/?v=resume` (default), `/?v=direction`, `/?v=stuck` or `/?v=interview`, so the ad's promise and the headline match. The variant travels to the thank-you page and is sent with the conversion event.
+
+Conversion tracking: put your ids in `track.js` (`ga4`, `meta`, or a Google Ads `gadsLabel`). It fires `begin_checkout`/`InitiateCheckout` on the start buttons and `purchase`/`StartTrial` on the join thank-you page. With the ids empty nothing loads.
+
+## Prices
+
+In `lib/newpage-pricing.js`: `toolsCents` is the membership ($25), `hourCents` the human coach session ($250 an hour, up to `maxHours` at a time). Caps per month are in `lib/newpage-usage.js`.
+
+## Tests
+
+```bash
+npm install
+npm test
+python3 -m unittest discover -s tests/py
+```

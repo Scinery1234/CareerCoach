@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI Career Coach · free for 7 days · then $25 a month</title>
+<meta name="description" content="Tailor your resume to every job in about a minute, write cover letters from your own proof, and talk it through with an AI coach that remembers you. Free for 7 days, then $25 a month. Cancel in two taps.">
+<meta property="og:title" content="A career coach in your pocket that remembers you. Free for 7 days.">
+<meta property="og:description" content="Tailor your resume to each job in a minute, nothing invented. Cover letters from your own proof. A coach that picks up where you left off. $25 a month after the free week.">
+<meta property="og:image" content="https://aicareercoach.net/og.png">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Figtree:wght@400;500;600;700&family=Caveat:wght@600&display=swap">
+<link rel="stylesheet" href="/styles.css">
+<style>
+/* The ad page: one message, one button, the product in view, proof close to the button. */
+.lp .top-in { justify-content: space-between; }
+.lp main { padding-bottom: 96px; }
+.hero { padding-top: 10px; display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 14px; font-weight: 600; color: var(--muted); }
+.eyebrow b { color: var(--ink); background: var(--hl); border-radius: 99px; padding: 2px 10px; }
+.hero h1 { font-size: clamp(34px, 8vw, 52px); line-height: 1.05; margin: 0; }
+.hero .lead { margin: 0; font-size: 18px; }
+.cta { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.cta .btn-primary { font-size: 18px; min-height: 56px; padding: 10px 26px; width: 100%; }
+.cta .sub { font-size: 14px; color: var(--muted); margin: 0; }
+.cta .sub a { color: var(--link); }
+.proof { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 14px; font-weight: 600; }
+.proof li { display: flex; gap: 6px; align-items: flex-start; }
+.proof li::before { content: '✓'; color: var(--ink); background: var(--hl); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: 0 0 auto; margin-top: 1px; }
+/* The product, drawn in HTML so it loads instantly and reads on a phone. */
+.shot { background: #fff; border: 2px solid var(--ink); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 0 var(--hl); font-size: 14px; }
+.shot .cap { font-family: var(--script, 'Caveat', cursive); font-size: 20px; color: #A33A16; margin: 0; }
+.shot .ttl { font-weight: 700; font-size: 16px; }
+.shot p { margin: 0; line-height: 1.45; }
+.chg { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; border: 1.5px solid var(--rule); border-radius: 10px; padding: 8px 10px; }
+.pill { font-size: 12px; font-weight: 700; border-radius: 99px; padding: 1px 9px; background: var(--hl); white-space: nowrap; }
+.pill.blue { background: #e3edff; } .pill.gap { background: #f1f1f1; color: var(--muted); } .pill.part { background: #fff3cd; }
+.match { display: flex; flex-direction: column; gap: 6px; }
+.match div { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px dashed var(--rule); padding: 4px 0; }
+.bubble { background: var(--paper-2); border-radius: 14px; padding: 10px 12px; }
+.bubble b { font-size: 13px; color: var(--muted); display: block; margin-bottom: 2px; }
+.sec { display: flex; flex-direction: column; gap: 12px; padding: 26px 0 6px; }
+.sec h2 { margin: 0; font-size: clamp(26px, 6vw, 34px); line-height: 1.1; }
+.sec > p { margin: 0; }
+.pains { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.pain { background: #fff; border: 1.5px solid var(--rule); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.pain b { font-family: var(--display); font-size: 30px; line-height: 1; }
+.pain span { font-size: 15px; }
+.pain small { color: var(--muted); font-size: 13px; }
+.steps3 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; counter-reset: s; }
+.steps3 li { display: flex; gap: 12px; align-items: flex-start; }
+.steps3 li::before { counter-increment: s; content: counter(s); flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: var(--hl); border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.steps3 b { display: block; }
+.inc2 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.inc2 div { background: #fff; border: 1.5px solid var(--rule); border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+.inc2 b { display: block; margin-bottom: 2px; }
+.pricebox { background: #fff; border: 2px solid var(--ink); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 0 var(--hl); }
+.pricebox .big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pricebox .big b { font-family: var(--display); font-size: 52px; line-height: 1; }
+.pricebox .big span { color: var(--muted); }
+.pricebox ul { margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+.pricebox .btn-primary { width: 100%; min-height: 56px; font-size: 18px; }
+.human2 { border: 1.5px solid var(--rule); border-radius: 14px; padding: 14px; background: #fff; font-size: 15px; }
+.faq details { background: #fff; border: 1.5px solid var(--rule); border-radius: 12px; padding: 0 14px; margin-bottom: 8px; }
+.faq summary { cursor: pointer; min-height: 48px; display: flex; align-items: center; font-weight: 600; }
+.faq details p { margin: 0 0 12px; font-size: 15px; }
+.final { text-align: left; padding: 30px 0 10px; display: flex; flex-direction: column; gap: 10px; }
+.sticky { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: rgba(255,255,255,.96); border-top: 1.5px solid var(--rule); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; transform: translateY(110%); transition: transform .2s ease, visibility .2s; visibility: hidden; }
+.sticky.on { transform: none; visibility: visible; }
+.sticky .btn { min-height: 48px; font-size: 16px; padding: 8px 18px; white-space: nowrap; }
+.sticky span { font-size: 14px; font-weight: 600; }
+.t0 { display: none; } body.notrial .t7 { display: none; } body.notrial .t0 { display: initial; }
+@media (min-width: 900px) {
+  .hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; align-items: start; }
+  .hero > .shot { grid-column: 2; grid-row: 1 / span 4; margin-top: 8px; }
+  .cta .btn-primary { width: auto; }
+  .pains, .inc2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inc2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sticky { display: none; }
+  .lp main { padding-bottom: 40px; }
+}
+</style>
+</head>
+<body class="lp">
+<div class="paper wide">
+  <div class="margin-line" aria-hidden="true"></div>
+  <header class="top">
+    <div class="top-in">
+      <a class="brand" href="/" aria-label="AI Career Coach">
+        <svg width="24" height="27" viewBox="0 0 32 36" aria-hidden="true"><path d="M3 2h18l8 8v24H3z" fill="#FFFFFF" stroke="#15203B" stroke-width="2.4" stroke-linejoin="round"/><path d="M21 2v8h8" fill="none" stroke="#15203B" stroke-width="2.4" stroke-linejoin="round"/><rect x="7" y="19" width="17" height="6" rx="2" fill="#D4F36B"/><path d="M8 29h11" stroke="#15203B" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span>AI Career Coach</span>
+      </a>
+      <a class="top-link" href="/app" style="border-bottom-color:transparent;color:var(--muted)">Member sign in</a>
+    </div>
+  </header>
+
+  <main class="col prog">
+    <section class="hero" id="hero">
+      <p class="eyebrow"><b class="t7">Free for 7 days</b><b class="t0">$25 a month</b><span class="t7">then $25 a month · cancel in two taps</span><span class="t0">cancel in two taps</span></p>
+      <h1 id="h1">Stop sending the same resume to every job.</h1>
+      <p class="lead" id="lead">Paste the ad. In about a minute your resume is tailored to it, with every change shown and nothing invented. Then a cover letter from your own proof, and a coach that remembers what you’re going for.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/join" data-track="cta" data-place="hero"><span class="t7">Start my free week</span><span class="t0">Start for $25 a month</span></a>
+        <p class="sub"><span class="t7">Card details, nothing charged for 7 days. </span><a href="/demo">See it first, no sign-up.</a></p>
+      </div>
+      <ul class="proof" aria-label="What you can count on">
+        <li>Nothing invented: your dates, employers and figures are locked</li>
+        <li>Tailor to a job in about a minute</li>
+        <li>Remembers you between sessions</li>
+        <li>A human coach when you want one</li>
+      </ul>
+      <div class="shot" aria-label="What a tailored resume looks like in the app">
+        <p class="cap">from the app</p>
+        <span class="ttl">Resume: Operations Coordinator at Acme</span>
+        <p>I rewrote your summary for this coordinator role, led with stakeholder engagement and budget management in your skills, and moved the client partnership work to the top of your current role. I didn’t add anything you haven’t done.</p>
+        <div class="chg"><span class="pill">Rewritten</span><b>Summary</b><span>for this role</span></div>
+        <div class="chg"><span class="pill blue">Reordered</span><b>Key skills</b><span>led with the ad’s three main asks</span></div>
+        <div class="match">
+          <div><span>Stakeholder engagement</span><span class="pill">In your resume</span></div>
+          <div><span>Budget management</span><span class="pill part">Thin</span></div>
+          <div><span>Salesforce</span><span class="pill gap">Not in your resume</span></div>
+        </div>
+        <div class="bubble"><b>Sky</b>Salesforce isn’t on your resume, so I left it out. If you’ve used it, tell me and I’ll add it where it’s true. Want the cover letter for this one next?</div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>Sound familiar?</h2>
+      <div class="pains">
+        <div class="pain"><b>55%</b><span>of job seekers say their biggest frustration is hearing nothing after applying.</span><small>Resume Genius survey of 1,000 active job seekers, 2026</small></div>
+        <div class="pain"><b>59%</b><span>believe fewer than a quarter of their applications are ever read by a person.</span><small>MyPerfectResume survey of 1,000 job seekers, 2025</small></div>
+        <div class="pain"><b>1 hour</b><span>is what a properly tailored resume and letter take by hand. So most people don’t, and the generic one gets filtered out.</span><small>Which is the part this fixes.</small></div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>How it works</h2>
+      <ol class="steps3">
+        <li><div><b>Upload your resume once.</b> Sky builds an Australian-format version from your own facts, as a Word file you check line by line.</div></li>
+        <li><div><b>Paste a job ad.</b> About a minute later: the tailored resume, what changed, how you match, and the gaps named honestly. Then the cover letter, written from your proof and reviewed like a recruiter would.</div></li>
+        <li><div><b>Talk it through.</b> Sky remembers your goals, your strengths and what’s in the way, so every conversation starts where the last one ended. Nine focus areas, from interview practice to getting unstuck.</div></li>
+      </ol>
+    </section>
+
+    <section class="sec">
+      <h2>What you get</h2>
+      <div class="inc2">
+        <div><b>Sky, an AI coach that remembers you</b>Nine focus areas: career, interview, getting into action, deciding on an offer, calming the charge, recovery and more.</div>
+        <div><b>Resume writer and tailoring</b>One resume built from your facts, then tailored to each ad with every change shown. 150 tailored resumes a month.</div>
+        <div><b>Cover letter writer</b>Reads the ad for what they’ll assess, asks for your proof, writes the letter, then reviews it like a recruiter.</div>
+        <div><b>The Compass</b>Ten short steps from your values and strengths to a direction and three first steps.</div>
+        <div><b>LinkedIn, outreach, planner, notes</b>A profile from your history, messages that get replies, and a place to plan the week.</div>
+        <div><b>Your data, your rules</b>Everything Sky learns is encrypted with a key just for you. See it, edit it, download it or delete it.</div>
+      </div>
+      <div class="human2"><b>When you want a person:</b> members can book a 60-minute online session with a qualified career counsellor and psychotherapist, $250, from inside the app. Your coach sees your Compass and what you choose to share, so you don’t start from scratch. Sky will suggest one only when it would genuinely help.</div>
+    </section>
+
+    <section class="sec" id="price">
+      <h2>One plan. No annual trap.</h2>
+      <div class="pricebox">
+        <div class="big"><b>$25</b><span>a month<span class="t7">, after 7 days free</span></span></div>
+        <ul>
+          <li class="t7">Nothing charged today. We email you three days before the trial ends.</li>
+          <li>Cancel in two taps from the app. You keep access to the end of what you’ve paid for.</li>
+          <li>Each month: 300 messages to Sky, 150 tailored resumes, 3 resumes from scratch, 100 cover letters. Everything else unlimited.</li>
+          <li>About what a resume builder alone charges. This one comes with a coach.</li>
+        </ul>
+        <a class="btn btn-primary" href="/join" data-track="cta" data-place="price"><span class="t7">Start my free week</span><span class="t0">Start for $25 a month</span></a>
+        <p class="small muted" style="margin:0">Australian dollars. Sky is an AI. Coaching, not therapy. For people 18 and over.</p>
+      </div>
+    </section>
+
+    <section class="sec faq">
+      <h2>Fair questions</h2>
+      <details><summary>Will it make things up on my resume?</summary><p>No. Employers, titles, dates and figures are locked to your original. If an ad asks for something you don’t have, it says so instead of adding it. You see every change before you download.</p></details>
+      <details><summary>Is Sky a real person?</summary><p>No. Sky is an AI, and says so. When you want a person, you can book a session with a human career coach from inside the app.</p></details>
+      <details><summary>What happens after the free week?</summary><p>It’s $25 a month until you cancel. We email you three days before the first charge. Cancel from Me in the app, two taps, and you won’t be charged.</p></details>
+      <details><summary>What does it remember, and who can see it?</summary><p>Short notes on your goals, strengths, limits and decisions, plus your resume. Encrypted with a key just for you. Nobody reads your chats unless you choose to share one with your human coach. Delete it all any time.</p></details>
+      <details><summary>Is this therapy?</summary><p>No. It’s coaching, and it doesn’t replace a counsellor, doctor or other health professional. If you’re in a hard place, call your local emergency number or find a helpline near you at findahelpline.com.</p></details>
+      <details><summary>Who is behind it?</summary><p>Purposefields, a vocational wellbeing organisation. We think career help should be affordable for everybody, which is why this costs $25 and not $250.</p></details>
+    </section>
+
+    <section class="final">
+      <h2>Your next application, done properly.</h2>
+      <p class="t7">Free for 7 days. Then $25 a month, cancel in two taps.</p><p class="t0">$25 a month, cancel in two taps.</p>
+      <div class="cta"><a class="btn btn-primary" href="/join" data-track="cta" data-place="final"><span class="t7">Start my free week</span><span class="t0">Start for $25 a month</span></a><p class="sub"><a href="/demo">Or see it first, no sign-up.</a></p></div>
+    </section>
+  </main>
+
+  <footer class="foot col">
+    <p>AI Career Coach is by <a href="https://purposefields.com.au">Purposefields</a>. Coaching, not therapy. For people 18 and over.</p>
+    <p>In crisis? Call your local emergency number, or find a helpline near you at <a href="https://findahelpline.com">findahelpline.com</a>.</p>
+    <p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+  </footer>
+</div>
+<div class="sticky" id="sticky"><span class="t7">$0 today · $25 a month after</span><span class="t0">$25 a month</span><a class="btn btn-primary" href="/join" data-track="cta" data-place="sticky"><span class="t7">Start free</span><span class="t0">Start</span></a></div>
+<script>
+// One page, several ad angles. ?v=resume (default), ?v=direction, ?v=stuck, ?v=interview.
+// The ad's promise and the headline match, which is where most of the conversion is.
+const V = {
+  resume: null,
+  direction: ['Not sure what’s next? Work it out with a coach that remembers you.', 'The Compass takes you from your values and strengths to a direction and three first steps, in ten short goes. Sky remembers all of it, so every conversation picks up where the last one ended. When you’re ready to apply, the resume and letters are there too.'],
+  stuck: ['Applying, hearing nothing, losing steam?', 'Most generic resumes never reach a person. Tailor yours to each ad in about a minute, nothing invented, then a cover letter from your own proof. And a coach for the days it all feels like too much.'],
+  interview: ['Practise the interview before the interview.', 'Sky asks the questions a real panel would ask for the role, one at a time, and tells you plainly what landed and what didn’t. It remembers your answers, so the next run starts stronger. Resume and letters included.']
+}
+const v = new URLSearchParams(location.search).get('v')
+if (V[v]) { document.getElementById('h1').textContent = V[v][0]; document.getElementById('lead').textContent = V[v][1] }
+// The sticky bar appears once the hero button has scrolled away (phones only; hidden on wide screens by CSS).
+const hero = document.querySelector('#hero .btn-primary'), bar = document.getElementById('sticky')
+new IntersectionObserver(e => { bar.classList.toggle('on', !e[0].isIntersecting && e[0].boundingClientRect.top < 0) }, { threshold: 0 }).observe(hero)
+// If the trial is switched off on the server, the page says $25 a month instead.
+fetch('/api/newpage/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"quote"}' }).then(r => r.json()).then(q => { if (!q.trialDays) document.body.classList.add('notrial') }).catch(() => {})
+</script>
+<script src="/track.js"></script>
+</body>
+</html>
