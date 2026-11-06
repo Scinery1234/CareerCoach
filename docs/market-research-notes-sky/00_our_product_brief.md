@@ -1,0 +1,7 @@
+# Our product: AI Career Coach (aicareercoach.net) by Purposefields — branch claude/fervent-gates-ejr1dq
+
+Checkout: /tmp/claude-0/-home-user-CareerCoach/d4fff7ac-e95a-58db-917a-bd076ed5dc45/scratchpad/fervent-gates (git worktree, commit 27ca6ac, 2026-11). Read README.md and BRAND.md there first.
+
+From the README: "Sky, an AI career coach that remembers you, with the tools around it (resume writer and tailoring, cover letter writer, the Compass, LinkedIn and outreach writers, planner, notes, a career direction report), sold as a $25-a-month membership. Members can add paid 60-minute online sessions with a human career coach, booked from inside the app." Standalone product carved from the "New Page" 4-week program (vikashan repo), with the program, quiz funnel and scholarship path removed. Stack: static HTML/CSS/JS member app (app/), Vercel serverless (api/), Python resume agent, Supabase, Stripe (7-day trial default, card at checkout), Resend emails, encrypted memory, usage caps, admin panel, demo without sign-up, retention/reminder/program-mail crons, ad landing page (index.html) with tracking (track.js).
+
+Earlier product on main ("The Compass", standalone, free, localStorage-only, non-directive, AU-only) was already audited; that audit is in ../AI career coaching competitive landscape/our_product_audit.md and is NOT about this branch. The four market notes copied into this folder (AI-native coaches, assessment tools, Australian landscape, platforms & trends) remain valid and should be reused.
