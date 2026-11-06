@@ -6,7 +6,7 @@ import { COACH_MODEL } from '../../lib/newpage-coach.js'
 
 // Admin only. "Check the system": runs each thing AI Career Coach depends on and says,
 // in plain words, what is working and what isn't. Nothing is sent or changed.
-const TABLES = ['newpage_members', 'newpage_notes', 'newpage_content', 'newpage_shares', 'newpage_access_log', 'newpage_codes', 'newpage_docs']
+const TABLES = ['newpage_members', 'newpage_notes', 'newpage_content', 'newpage_shares', 'newpage_access_log', 'newpage_codes', 'newpage_docs', 'newpage_applications']
 
 const check = async (name, fn) => {
   const t = Date.now()

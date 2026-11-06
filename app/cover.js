@@ -5,11 +5,12 @@
 // you. The letter is written from that evidence only, in Australian format.
 import { h, copyText } from './ui.js'
 import { templatePicker, pagePreview, saveB64, DOCX_TYPE, safeName, fileToB64, resumeFileProblem } from './docfiles.js'
+import { appliedCard } from './apply.js'
 
 const L = {
   step: 1, job: '', role: '', company: '', themes: [], reqs: [], ev: {}, openKw: 0, addKw: '',
   name: '', currentTitle: '', years: '', why: '', unique: '', phone: '', location: '', linkedin: '', template: 'modern',
-  resume: '', resumeFile: '', savedResume: null, resumeId: '', handed: false, profileText: '', pasteOpen: false, uploading: false, quick: false,
+  resume: '', resumeFile: '', savedResume: null, resumeId: '', handed: false, applied: {}, profileText: '', pasteOpen: false, uploading: false, quick: false,
   busy: false, analysing: '', err: '', cur: null, files: {}, docs: null, loading: false, draft: null, saving: false, note: '', review: null, reviewing: false, base: null, revising: false, replies: {}, revNote: ''
 }
 
@@ -293,6 +294,7 @@ export function coverScreen(ctx) {
     h('div', { class: 'row doc-actions' },
       h('button', { class: 'btn btn-primary', type: 'button', disabled: !files, onclick: () => saveB64(`${safeName(cur.title)}.docx`, files.docx, DOCX_TYPE) }, 'Download Word file'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: e => copyText(coverText(cur.content), e.currentTarget) }, 'Copy text')),
+    !fresh && appliedCard(ctx, { title: cur.content.role || L.role || '', company: cur.content.company || L.company || '', url: '', job: cur.content.job || L.job || '', cover_doc_id: cur.id, resume_doc_id: L.savedResume?.content?.tailored ? L.resumeId : undefined }, (L.applied[cur.id] ||= {})),
     h('div', { class: 'field' }, h('span', { class: 'label' }, 'Style'),
       templatePicker(cur.content.template || 'modern', async id => {
         try { const r = await ctx.call('/api/newpage/app', { action: 'doc_template', id: cur.id, template: id }); L.cur = r.doc; L.docs = L.docs.map(x => (x.id === r.doc.id ? r.doc : x)); L.template = id } catch (e) { L.err = e.message }

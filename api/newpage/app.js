@@ -28,6 +28,7 @@ import {
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
+import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS } from '../../lib/newpage-apply.js'
 import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
 
@@ -52,7 +53,7 @@ async function writeVault(member) {
 }
 // The Compass is program work and stays as it is. The resume and the "about you"
 // answers are part of Sky's memory, so they are encrypted with the member's key.
-const PRIVATE_TOOLS = ['profile', 'about', 'steer']
+const PRIVATE_TOOLS = ['profile', 'about', 'steer', 'apply']
 async function getTool(member, tool) {
   const { data } = await supabase.from('newpage_tools').select('data').eq('member_id', member.id).eq('tool', tool).maybeSingle()
   return PRIVATE_TOOLS.includes(tool) ? openJson(await openVault(member), `tool:${tool}`, data?.data) : data?.data
@@ -62,20 +63,34 @@ async function setTool(member, tool, value) {
   await supabase.from('newpage_tools').upsert({ member_id: member.id, tool, data: sealJson(v, `tool:${tool}`, value), updated_at: new Date().toISOString() }, { onConflict: 'member_id,tool' })
 }
 
+// Application log rows: the personal fields are sealed with the member's key.
+const sealApplication = (vault, row) => { const out = { ...row }; for (const f of SEALED_FIELDS) if (typeof out[f] === 'string' && out[f]) out[f] = sealText(vault, 'app', out[f]); return out }
+const openApplication = (vault, row) => { const out = { ...row }; for (const f of SEALED_FIELDS) if (typeof out[f] === 'string') out[f] = openText(vault, 'app', out[f]); return out }
+const APP_COLS = 'id, title, company, board, url, status, applied_at, status_at, fit, source, notes, resume_doc_id, cover_doc_id, created_at'
+async function listApplications(member, vault) {
+  const { data } = await supabase.from('newpage_applications').select(APP_COLS).eq('member_id', member.id).order('created_at', { ascending: false }).limit(500)
+  return (data || []).map(a => openApplication(vault, a))
+}
+
 async function load(member, coach = 'career') {
   const memberId = member.id
   const vault = await openVault(member)
-  const [progress, tasks, checkins, memory, messages, goals, bookings] = await Promise.all([
+  const [progress, tasks, checkins, memory, messages, goals, bookings, apps, applyRaw] = await Promise.all([
     supabase.from('newpage_progress').select('week, step').eq('member_id', memberId),
     supabase.from('newpage_tasks').select('id, title, due, done, source, created_at, block_start, block_mins, goal_id').eq('member_id', memberId).order('created_at', { ascending: true }).limit(200),
     supabase.from('newpage_checkins').select('clarity, capacity, quadrant, created_at').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
     supabase.from('newpage_memory').select('id, note').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
     supabase.from('newpage_messages').select('role, content, created_at').eq('member_id', memberId).eq('coach', coach).order('id', { ascending: false }).limit(40),
     supabase.from('newpage_goals').select('id, title, target, done').eq('member_id', memberId).order('created_at', { ascending: true }).limit(50),
-    supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100)
+    supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100),
+    supabase.from('newpage_applications').select('id, title, company, board, url, status, applied_at, status_at, fit, source, resume_doc_id, cover_doc_id, created_at').eq('member_id', memberId).order('created_at', { ascending: false }).limit(200),
+    getTool(member, 'apply')
   ])
+  const applySettings = cleanApplySettings(applyRaw)
+  const applications = (apps.data || []).map(a => openApplication(vault, a))
   return {
     progress: progress.data || [], goals: goals.data || [], bookings: bookings.data || [],
+    applications, applySettings, pipeline: pipelineSummary(applications, { target: applySettings.weeklyTarget }),
     tasks: (tasks.data || []).map(t => ({ id: t.id, title: t.title, due: t.due, done: t.done, source: t.source, goalId: t.goal_id || null, start: t.block_start ? String(t.block_start).slice(0, 5) : null, mins: t.block_mins || null })), checkins: checkins.data || [],
     memory: (memory.data || []).map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
     messages: (messages.data || []).map(m => ({ ...m, content: openText(vault, 'msg', m.content) })).reverse()
@@ -371,6 +386,46 @@ export default async function handler(req, res) {
     // Tailor a saved resume for one job ad: one short call that selects, reorders and rewords
     // what is already true, and reports what changed and how the ad is matched. Saved as its
     // own resume under the one it came from. Counted as 'tailored' for tools members.
+    // ── Applications: what went out, and what came back ──
+    case 'apply_list': {
+      const vault = await openVault(member)
+      return res.json({ applications: await listApplications(member, vault), settings: cleanApplySettings(await getTool(member, 'apply')) })
+    }
+    case 'apply_add': {
+      const row = cleanApplication(b)
+      if (!row) return res.status(400).json({ error: 'Add the role title first.' })
+      let vault
+      try { vault = await writeVault(member) } catch (err) { return res.status(err.status || 500).json({ error: err.message }) }
+      // Documents must be the member's own. A tailored resume brings its match table along as the fit.
+      const docIds = ['resume_doc_id', 'cover_doc_id'].filter(k => ID_RE.test(String(b[k] || '')))
+      const docs = docIds.length ? (await supabase.from('newpage_docs').select('id, kind, content').eq('member_id', member.id).in('id', docIds.map(k => b[k]))).data || [] : []
+      for (const k of docIds) { const d = docs.find(x => x.id === b[k]); if (!d) return res.status(404).json({ error: 'That document isn’t in your account.' }); row[k] = d.id; if (k === 'resume_doc_id') row.fit = fitFromDoc(d.content) }
+      const existing = await listApplications(member, vault)
+      const dup = findDuplicate(existing, row)
+      if (dup) return res.json({ application: dup, duplicate: true, ...(await me(member, coachOf(b.coach))) })
+      const { data: saved, error } = await supabase.from('newpage_applications').insert({ member_id: member.id, ...sealApplication(vault, row), status_at: new Date().toISOString() }).select(APP_COLS).single()
+      if (error) return res.status(500).json({ error: 'That didn’t save. Please try again.' })
+      return res.json({ application: openApplication(vault, saved), duplicate: false, ...(await me(member, coachOf(b.coach))) })
+    }
+    case 'apply_update': {
+      if (!ID_RE.test(String(b.id))) return res.status(400).json({ error: 'Unknown application.' })
+      const patch = cleanApplicationPatch(b)
+      if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to change.' })
+      let vault
+      try { vault = await writeVault(member) } catch (err) { return res.status(err.status || 500).json({ error: err.message }) }
+      await supabase.from('newpage_applications').update(sealApplication(vault, patch)).eq('id', b.id).eq('member_id', member.id)
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+    case 'apply_delete': {
+      if (!ID_RE.test(String(b.id))) return res.status(400).json({ error: 'Unknown application.' })
+      await supabase.from('newpage_applications').delete().eq('id', b.id).eq('member_id', member.id)
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+    case 'apply_settings_set': {
+      await setTool(member, 'apply', cleanApplySettings(b))
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+
     case 'resume_tailor': {
       if (!ID_RE.test(String(b.id))) return res.status(400).json({ error: 'Choose the resume to tailor.' })
       const job = clipText(b.job, 20000), role = clip(b.role, 120), company = clip(b.company, 120)
@@ -735,7 +790,7 @@ export default async function handler(req, res) {
       const current = steerAll[coach] && Date.now() - new Date(steerAll[coach].at).getTime() < 3 * 24 * 60 * 60 * 1000 ? steerAll[coach] : null
       const system = coachSystem({
         member, tasks: data.tasks, memory: data.memory, compass: cp ? cleanCompass(cp) : null, coach,
-        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || []
+        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline
       })
       const tools = {
         run: async (name, input) => {

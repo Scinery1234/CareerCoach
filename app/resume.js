@@ -10,6 +10,7 @@
 // The gates live on the server; this screen shows the conversation and the results.
 import { h, copyText } from './ui.js'
 import { saveB64, DOCX_TYPE, fileToB64, resumeFileProblem, safeName } from './docfiles.js'
+import { appliedCard } from './apply.js'
 
 const API = '/api/newpage/resume'
 const QUICK = { AWAITING_CONTENT_APPROVAL: 'Yes', EXECUTION_FAILED: 'Try again' }
@@ -17,7 +18,7 @@ const QUICK = { AWAITING_CONTENT_APPROVAL: 'Yes', EXECUTION_FAILED: 'Try again' 
 const APPROVAL = /^(y|yes|yep|yeah|approved?|looks good|proceed|go ahead|content approved|perfect|lgtm|try again|retry)\b/i
 const L = {
   text: null, fileName: '', job: '', jobFile: '', role: '', extra: '', uploading: '', busy: '', err: '', note: '', conv: null, docs: null, docId: null, loading: false, reply: '', pasteOpen: false,
-  mode: null, baseId: '', tailJob: '', tailJobFile: '', tailRole: '', tailCo: '', tail: null, files: {}, showAll: false,
+  mode: null, baseId: '', tailJob: '', tailJobFile: '', tailRole: '', tailCo: '', tail: null, files: {}, showAll: false, applied: {},
   renaming: '', newName: ''
 }
 
@@ -217,6 +218,7 @@ function tailorView(ctx, doc) {
       h('button', { class: 'btn btn-primary', type: 'button', disabled: building, onclick: () => download(ctx, doc) }, building ? 'Building the Word file…' : f ? 'Download Word file' : 'Download Word file'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => toCover(ctx, doc) }, 'Write the cover letter for this job')),
     L.err && h('p', { class: 'error', role: 'alert' }, L.err),
+    appliedCard(ctx, { title: t.role || doc.content.target_title || '', company: t.company || '', url: '', job: doc.content.job_description || '', resume_doc_id: doc.id }, (L.applied[doc.id] ||= {})),
 
     h('div', { class: 'tl-block' }, h('b', {}, 'What changed'),
       changes.length === 0 ? h('p', { class: 'small muted' }, 'Only small wording changes.')

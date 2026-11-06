@@ -409,3 +409,29 @@ ALTER TABLE newpage_usage ENABLE ROW LEVEL SECURITY;
 -- ── Tailored resumes (a saved resume adjusted for one job ad), counted separately ──
 ALTER TABLE newpage_usage DROP CONSTRAINT IF EXISTS newpage_usage_kind_check;
 ALTER TABLE newpage_usage ADD CONSTRAINT newpage_usage_kind_check CHECK (kind IN ('messages','resumes','tailored','covers'));
+
+-- ── Applications ──
+-- What a member has applied for and what came back. title, company, url,
+-- job_description and notes are sealed with the member's key (newpage-vault.js);
+-- status, board, dates, fit and source stay plain so the Today card and the
+-- crons can filter on them.
+CREATE TABLE IF NOT EXISTS newpage_applications (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  member_id uuid REFERENCES newpage_members(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  company text,
+  board text CHECK (board IN ('seek','indeed','linkedin','jora','employer','other')),
+  url text,
+  job_description text,
+  resume_doc_id uuid REFERENCES newpage_docs(id) ON DELETE SET NULL,
+  cover_doc_id uuid REFERENCES newpage_docs(id) ON DELETE SET NULL,
+  fit jsonb,
+  status text NOT NULL DEFAULT 'applied' CHECK (status IN ('saved','applied','viewed','screening','interview','offer','rejected','withdrawn','no_reply')),
+  applied_at date,
+  status_at timestamptz DEFAULT now(),
+  notes text,
+  source text DEFAULT 'member' CHECK (source IN ('member','alert','extension')),
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS newpage_applications_member_idx ON newpage_applications (member_id, applied_at DESC);
+ALTER TABLE newpage_applications ENABLE ROW LEVEL SECURITY;

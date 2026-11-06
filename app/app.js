@@ -3,6 +3,7 @@ import { h, todayStr } from './ui.js'
 import { plannerScreen } from './planner.js'
 import { compassScreen, compassStatus, COMPASS_STEPS } from './compass.js'
 import { docsScreen } from './docs.js'
+import { applyScreen, pipelineCard } from './apply.js'
 import { sessionScreen } from './session.js'
 import { sectionsScreen, sectionKinds } from './sections.js'
 import { openSky, skySeen } from './sky.js'
@@ -326,6 +327,7 @@ function toolsToday(me, first) {
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky'),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Open the Compass'))),
       gettingStarted(me),
+      pipelineCard(me, go),
       u && h('div', { class: 'card' }, h('span', { class: 'label' }, 'This month'),
         h('p', { class: 'small' }, `Sky: ${u.used.messages} of ${u.caps.messages} messages · resumes: ${u.used.resumes} of ${u.caps.resumes} · tailored: ${u.used.tailored || 0} of ${u.caps.tailored} · cover letters: ${u.used.covers} of ${u.caps.covers}. Everything else is unlimited. Resets on the 1st.`)),
       h('div', { class: 'card' }, h('span', { class: 'label' }, 'Want a person in the loop?'),
@@ -472,6 +474,7 @@ const TOOL_GROUPS = [
   ['Get hired', [
     ['resume', 'Resume writer', 'A tailored resume from your own work history and a job ad.'],
     ['cover', 'Cover letter writer', 'A short letter in your voice for one specific job.'],
+    ['apply', 'Applications', 'What you’ve applied for and what came back.'],
     ['linkedin', 'LinkedIn profile writer', 'Headline, About, experience and skills, from your own history.'],
     ['outreach', 'Outreach messages', 'Ask for a conversation, follow up, and say thank you.']]],
   ['A human coach', [
@@ -493,12 +496,13 @@ function toolsScreen() {
   if (S.tool === 'context') return contextScreen(ctx)
   if (S.tool === 'compass') return compassScreen(ctx)
   if (S.tool === 'resume' || S.tool === 'cover') return docsScreen(ctx, S.tool)
+  if (S.tool === 'apply') return applyScreen(ctx)
   if (sectionKinds.includes(S.tool)) return sectionsScreen(ctx, S.tool)
   const me = S.me
   const open = me.tasks.filter(t => !t.done).length
   const due = me.tasks.filter(t => !t.done && t.due && t.due <= todayStr()).length
   compassStatus(ctx).then(c => { const n = c ? (c.done ? 'Finished' : c.step > 0 || c.values.length ? `Step ${c.step + 1} of 10: ${COMPASS_STEPS[c.step]}` : '') : ''; if (n !== compassNote) { compassNote = n; if (S.tab === 'tools' && !S.tool) render() } })
-  const status = { session: me.sessions.upcoming.length ? 'Booked' : me.sessions.remaining ? `${me.sessions.remaining} paid for` : `$${me.prices.hourCents / 100} an hour`, planner: due ? `${due} due today` : open ? `${open} open` : '', compass: compassNote, resume: '', cover: '', report: '', linkedin: '', outreach: '', brief: '', progress: '' }
+  const status = { session: me.sessions.upcoming.length ? 'Booked' : me.sessions.remaining ? `${me.sessions.remaining} paid for` : `$${me.prices.hourCents / 100} an hour`, planner: due ? `${due} due today` : open ? `${open} open` : '', compass: compassNote, resume: '', cover: '', apply: me.pipeline?.total ? `${me.pipeline.thisWeek} this week` : '', report: '', linkedin: '', outreach: '', brief: '', progress: '' }
   return h('section', { class: 'screen' },
     h('div', {}, h('span', { class: 'note' }, 'your toolkit'), h('h2', {}, 'Tools'), h('p', { class: 'muted' }, 'These save to your account, and Sky knows about your tasks.')),
     TOOL_GROUPS.map(([group, items]) => [h('h3', { class: 'group' }, group), h('div', { class: 'toolgrid' }, items.map(([id, name, blurb]) =>
