@@ -19,7 +19,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | `api/webhooks/stripe.js` | Stripe: membership paid, renewed, cancelled; sessions bought. |
 | `lib/` | Everything shared: Sky's prompts and principles, memory encryption, usage caps, emails, Stripe. |
 | `content/` | The program content modules Sky and the content editor still reference. The program itself is not sold here. |
-| `sql/` | Supabase schema: `schema.sql` (bookings) then `newpage.sql` (members, docs, memory, usage). |
+| `sql/` | Supabase schema: `schema.sql` (bookings) then `newpage.sql` (members, docs, memory, usage). `apply-migration.sql` is the Apply work's part of `newpage.sql` on its own, for a database that already has the rest. |
 | `tests/` | `npm test` (Node) and `python3 -m unittest discover -s tests/py`. |
 
 ## Deploy
