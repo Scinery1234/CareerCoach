@@ -29,22 +29,22 @@
     <section class="screen" id="form-screen">
       <span class="note">join</span>
       <h1>Start <span class="hl">AI Career Coach</span></h1>
-      <p class="lead">Four weeks with a coach in your corner, and a 60-minute session with your coach.</p>
+      <p class="lead">Sky, the writers and the Compass, for $25 a month. Cancel any time from the app.</p>
       <form id="join-form" class="card" novalidate>
         <div class="field"><label for="j-name">Your name</label><input id="j-name" type="text" autocomplete="name" maxlength="80" required></div>
         <div class="field"><label for="j-email">Email</label><input id="j-email" type="email" autocomplete="email" inputmode="email" maxlength="200" required>
           <p class="small muted">This is how you’ll sign in. We’ll send a link, so there’s no password.</p></div>
         <div class="hp" aria-hidden="true"><label for="j-website">Leave this empty</label><input id="j-website" type="text" tabindex="-1" autocomplete="off"></div>
-        <div class="field" id="hours-field"><span class="label" id="hours-label">Extra time with your coach (optional)</span>
+        <div class="field" id="hours-field" hidden><span class="label" id="hours-label">Extra time with a human coach (optional)</span>
           <p class="small muted">Each extra hour is a 60-minute session, $250. Add up to 8.</p>
           <div class="stepper" role="group" aria-labelledby="hours-label"><button type="button" id="h-minus" aria-label="One fewer extra hour">−</button><output id="h-val" aria-live="polite">0</output><button type="button" id="h-plus" aria-label="One more extra hour">+</button></div></div>
-        <div class="field"><label for="j-code">Scholarship code (if you have one)</label>
+        <div class="field" hidden><label for="j-code">Code (if you have one)</label>
           <div class="code-row"><input id="j-code" type="text" autocomplete="off" autocapitalize="characters" maxlength="24" placeholder="NP-XXXX-XXXX-XXXX"><button class="btn btn-secondary" type="button" id="code-apply">Apply</button></div>
           <p class="small" id="code-msg" role="status"></p></div>
         <div id="summary" aria-live="polite"></div>
         <p class="error" id="j-error" role="alert" hidden></p>
         <button class="btn btn-primary" type="submit" id="j-submit">Pay and start</button>
-        <p class="small muted" id="j-fine">Pay by card on the next page. <b>Change your mind within 7 days? Full refund.</b> Do the four weeks and don’t move forward? Your next month is on us. Coaching, not therapy. For people 18 and over.</p>
+        <p class="small muted" id="j-fine">Pay by card on the next page. <b>Change your mind within 7 days? Full refund.</b> Coaching, not therapy. For people 18 and over. <a href="/">What’s included?</a></p>
       </form>
     </section>
     <section class="screen" id="done-screen" hidden>

@@ -258,5 +258,5 @@ function summary(ctx, C) {
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: e => copyText(text, e.currentTarget) }, 'Copy my Compass'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = 'my-compass.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000) } }, 'Download as text')),
-    h('p', { class: 'small muted' }, 'Sky knows your direction and values. Bring this to your session with your coach.'))
+    h('p', { class: 'small muted' }, 'Sky knows your direction and values. If you book a session with a human coach, bring this along.'))
 }

@@ -97,7 +97,7 @@ export function plannerScreen(ctx) {
     scheduled.length > 0 && h('div', { class: 'card' },
       h('span', { class: 'label' }, 'Put it in your calendar'),
       h('p', { class: 'small muted' }, 'Add one task with its “Google” link, or download everything that has a date as a file for Apple, Outlook or any calendar. Your calendar copy won’t update if you change a task here.'),
-      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => download('new-page-planner.ics', ics(scheduled), 'text/calendar') }, `Download ${scheduled.length} dated task${scheduled.length === 1 ? '' : 's'} (.ics)`)),
+      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => download('ai-career-coach-planner.ics', ics(scheduled), 'text/calendar') }, `Download ${scheduled.length} dated task${scheduled.length === 1 ? '' : 's'} (.ics)`)),
     goalsCard,
     done.length > 0 && h('div', { class: 'card' },
       h('button', { class: 'link-btn', type: 'button', onclick: () => { L.showDone = !L.showDone; render() } }, L.showDone ? 'Hide finished tasks' : `Show ${done.length} finished task${done.length === 1 ? '' : 's'}`),
@@ -109,8 +109,8 @@ export function plannerScreen(ctx) {
       h('p', { class: 'small muted' }, 'Around 7am Sydney time, only on days with something due.'),
       h('label', { class: 'check' },
         h('input', { type: 'checkbox', checked: me.member.programEmails, onchange: e => run('program_emails_set', { on: e.target.checked }) }),
-        h('span', {}, 'Email me your coach’s nudges during the four weeks')),
-      h('p', { class: 'small muted' }, 'A note at the start of weeks 2 to 4, a reminder to book your session, and a check-in if you go quiet. Receipts and booking emails always come.')))))
+        h('span', {}, 'Email me a nudge now and then')),
+      h('p', { class: 'small muted' }, 'A short note if you go quiet, and a reminder before a booked session. Receipts and booking emails always come.')))))
 }
 
 function minsSelect(value, on) {

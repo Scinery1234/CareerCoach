@@ -157,7 +157,7 @@ export default async function handler(req, res) {
     if (['renew_checkout', 'hours_checkout', 'session_book', 'reminders_set', 'program_emails_set', 'share_chat', 'share_context'].includes(b.action)) {
       return res.status(403).json({ error: 'That part isn’t in the demo. Join AI Career Coach to use it.', code: 'demo' })
     }
-    if (b.action === 'coach' || (b.action === 'doc_generate') || b.action === 'doc_edit' || b.action === 'compass_suggest') {
+    if (['coach', 'doc_generate', 'doc_edit', 'compass_suggest', 'resume_tailor', 'cover_analyse', 'cover_draft', 'cover_review', 'cover_revise'].includes(b.action)) {
       const kind = b.action === 'coach' ? 'messages' : 'docs'
       const a = await demoAllowance(member.id, kind)
       if (!a.ok) return res.status(429).json({ error: a.why, code: 'demo_cap', used: a.used, cap: a.cap })
