@@ -26,9 +26,11 @@ http.createServer(async (req, res) => {
     return
   }
   if (req.url === '/__token') { res.end(signSession(ME.id)); return }
+  // Open http://localhost:4173/__login in a browser to click around as the seeded member.
+  if (req.url === '/__login') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!doctype html><script>localStorage.setItem('np_app_session', ${JSON.stringify(signSession(ME.id))}); location.replace('/app/index.html#today')</script>`); return }
   let p = decodeURIComponent(req.url.split('?')[0].split('#')[0])
   if (p === '/app' || p === '/app/') p = '/app/index.html'
   const f = join(ROOT, p)
   if (existsSync(f) && !f.endsWith('/')) { res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return }
   res.writeHead(404); res.end('nope ' + p)
-}).listen(4173, () => console.log('ready'))
+}).listen(4173, () => console.log('ready: open http://localhost:4173/__login to use the app as the seeded member (no AI key: Sky and the writers are off, everything else works)'))
