@@ -66,4 +66,4 @@ npm test
 python3 -m unittest discover -s tests/py
 ```
 
-`npm test` also runs `extension/tests`, which load the content scripts into a small DOM (linkedom) against saved form pages. Handler tests run against an in-memory Supabase (`tests/helpers/fake-supabase.js`), installed on `globalThis.__fakeSupabase` before `lib/supabase.js` is imported, so no database or network is needed.
+`tests/e2e/` drives the member app in a real browser against the real member endpoint over the in-memory database (needs Playwright, not part of `npm test`): `node tests/e2e/server.mjs &` then `node tests/e2e/apply.mjs`. `npm test` also runs `extension/tests`, which load the content scripts into a small DOM (linkedom) against saved form pages. Handler tests run against an in-memory Supabase (`tests/helpers/fake-supabase.js`), installed on `globalThis.__fakeSupabase` before `lib/supabase.js` is imported, so no database or network is needed.
