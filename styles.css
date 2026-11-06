@@ -224,3 +224,6 @@ p { margin: 0; }
 .quote { margin: 0; background: #fff; border: 1.5px solid var(--rule); border-left: 5px solid var(--hl); border-radius: 14px; padding: 18px 20px; }
 .quote p { margin: 0 0 10px; font-size: 17px; line-height: 1.55; }
 .quote cite { font-style: normal; font-weight: 700; font-size: 14px; color: var(--muted); }
+
+/* Very narrow effective widths (a phone at 150% browser zoom): keep the icon, drop the brand text. */
+@media (max-width: 300px) { .brand span { display: none; } }
