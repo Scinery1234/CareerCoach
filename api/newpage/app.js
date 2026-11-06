@@ -28,7 +28,7 @@ import {
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../../lib/newpage-resume.js'
-import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS } from '../../lib/newpage-apply.js'
+import { cleanApplication, cleanApplicationPatch, cleanApplySettings, fitFromDoc, findDuplicate, pipelineSummary, SEALED_FIELDS, applyStage, applyPatterns, offerDecision, recordOffer, STATUSES, OFFER_ANSWERS } from '../../lib/newpage-apply.js'
 import { TAILOR_SYSTEM, TAILOR_SCHEMA, tailorPrompt, cleanTailor, tailoredTitle, tailorNote } from '../../lib/newpage-tailor.js'
 import { COVER_SYSTEM, COVER_SCHEMA, analyseJob, buildCoverPrompt, analysePrompt, ANALYSE_SYSTEM, ANALYSE_SCHEMA, cleanAnalysis, GAPS_SCHEMA, gapsPrompt, cleanGaps, REVIEW_SYSTEM, REVIEW_SCHEMA, reviewPrompt, cleanReview, coverText, revisePrompt, cleanAnswers, cleanCover, cleanEvidence, coverTitle, sydneyDate } from '../../lib/newpage-cover.js'
 
@@ -72,10 +72,27 @@ async function listApplications(member, vault) {
   return (data || []).map(a => openApplication(vault, a))
 }
 
+// Where they are with applying and whether Sky should offer. `matches` (the match
+// tables of recent tailored resumes) is only to hand in the coach action.
+function applyState({ docs, applications, applySettings, matches = [] }) {
+  const stage = applyStage({ docs, apps: applications })
+  const patterns = applyPatterns({ apps: applications, matches })
+  return { stage, patterns, offer: applySettings.offer, emails: applySettings.emails, decision: offerDecision({ stage, patterns, offer: applySettings.offer }) }
+}
+function withMatches(data, matches) {
+  const patterns = applyPatterns({ apps: data.applications, matches })
+  return { ...data.apply, patterns, decision: offerDecision({ stage: data.apply.stage, patterns, offer: data.applySettings.offer }) }
+}
+async function patchApplySettings(member, patch) {
+  const next = cleanApplySettings({ ...cleanApplySettings(await getTool(member, 'apply')), ...patch })
+  await setTool(member, 'apply', next)
+  return next
+}
+
 async function load(member, coach = 'career') {
   const memberId = member.id
   const vault = await openVault(member)
-  const [progress, tasks, checkins, memory, messages, goals, bookings, apps, applyRaw] = await Promise.all([
+  const [progress, tasks, checkins, memory, messages, goals, bookings, apps, applyRaw, docs] = await Promise.all([
     supabase.from('newpage_progress').select('week, step').eq('member_id', memberId),
     supabase.from('newpage_tasks').select('id, title, due, done, source, created_at, block_start, block_mins, goal_id').eq('member_id', memberId).order('created_at', { ascending: true }).limit(200),
     supabase.from('newpage_checkins').select('clarity, capacity, quadrant, created_at').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
@@ -84,13 +101,15 @@ async function load(member, coach = 'career') {
     supabase.from('newpage_goals').select('id, title, target, done').eq('member_id', memberId).order('created_at', { ascending: true }).limit(50),
     supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100),
     supabase.from('newpage_applications').select('id, title, company, board, url, status, applied_at, status_at, fit, source, resume_doc_id, cover_doc_id, created_at').eq('member_id', memberId).order('created_at', { ascending: false }).limit(200),
-    getTool(member, 'apply')
+    getTool(member, 'apply'),
+    supabase.from('newpage_docs').select('kind, created_at').eq('member_id', memberId).in('kind', ['resume', 'cover']).order('created_at', { ascending: false }).limit(30)
   ])
   const applySettings = cleanApplySettings(applyRaw)
   const applications = (apps.data || []).map(a => openApplication(vault, a))
   return {
     progress: progress.data || [], goals: goals.data || [], bookings: bookings.data || [],
     applications, applySettings, pipeline: pipelineSummary(applications, { target: applySettings.weeklyTarget }),
+    apply: applyState({ docs: docs.data || [], applications, applySettings }),
     tasks: (tasks.data || []).map(t => ({ id: t.id, title: t.title, due: t.due, done: t.done, source: t.source, goalId: t.goal_id || null, start: t.block_start ? String(t.block_start).slice(0, 5) : null, mins: t.block_mins || null })), checkins: checkins.data || [],
     memory: (memory.data || []).map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
     messages: (messages.data || []).map(m => ({ ...m, content: openText(vault, 'msg', m.content) })).reverse()
@@ -422,7 +441,20 @@ export default async function handler(req, res) {
       return res.json(await me(member, coachOf(b.coach)))
     }
     case 'apply_settings_set': {
-      await setTool(member, 'apply', cleanApplySettings(b))
+      const patch = {}
+      if (b.weeklyTarget !== undefined) patch.weeklyTarget = b.weeklyTarget
+      if (b.emails !== undefined) patch.emails = b.emails === true
+      await patchApplySettings(member, patch)
+      return res.json(await me(member, coachOf(b.coach)))
+    }
+    case 'apply_offer_set': {
+      // The Today card's "Not now" (later) or "Talk to Sky" (yes), or a change in the Applications tool.
+      const data = await load(member)
+      const prev = data.applySettings.offer
+      const answer = b.answer === 'reset' ? null : b.answer
+      if (answer !== null && !OFFER_ANSWERS.includes(answer)) return res.status(400).json({ error: 'Answer must be yes, no, later or reset.' })
+      const offer = answer === null ? null : recordOffer(prev, { answer, stage: data.apply.stage, patterns: data.apply.patterns })
+      await patchApplySettings(member, { offer })
       return res.json(await me(member, coachOf(b.coach)))
     }
 
@@ -790,7 +822,9 @@ export default async function handler(req, res) {
       const current = steerAll[coach] && Date.now() - new Date(steerAll[coach].at).getTime() < 3 * 24 * 60 * 60 * 1000 ? steerAll[coach] : null
       const system = coachSystem({
         member, tasks: data.tasks, memory: data.memory, compass: cp ? cleanCompass(cp) : null, coach,
-        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline
+        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline,
+        // Same stage as load() found, with the recent tailored resumes' match tables added for the "same gap" pattern.
+        apply: withMatches(data, (recent.data || []).map(d => d.content?.tailored?.match).filter(Boolean))
       })
       const tools = {
         run: async (name, input) => {
@@ -812,6 +846,36 @@ export default async function handler(req, res) {
             const due = typeof input.due === 'string' && DATE_RE.test(input.due) ? input.due : null
             await supabase.from('newpage_tasks').insert({ member_id: member.id, title, due, source: 'coach' })
             return 'Added to their task list.'
+          }
+          if (name === 'log_application') {
+            const row = cleanApplication({ ...input, status: input.status === 'saved' ? 'saved' : 'applied', source: 'member' })
+            if (!row) return 'No role title given.'
+            const dup = findDuplicate(data.applications, row)
+            if (dup) return `Already logged: ${dup.title}${dup.company ? ' at ' + dup.company : ''} (${dup.status}).`
+            const { data: saved } = await supabase.from('newpage_applications').insert({ member_id: member.id, ...sealApplication(vault, row), status_at: new Date().toISOString() }).select(APP_COLS).single()
+            if (saved) data.applications.unshift(openApplication(vault, saved))
+            return `Logged: ${row.title}${row.company ? ' at ' + row.company : ''}, ${row.status === 'saved' ? 'saved to apply for' : 'applied ' + row.applied_at}.`
+          }
+          if (name === 'update_application') {
+            if (!STATUSES.includes(input.status)) return 'Unknown status.'
+            const want = String(input.title || '').toLowerCase(), co = String(input.company || '').toLowerCase()
+            const hits = data.applications.filter(a => a.title.toLowerCase().includes(want) || want.includes(a.title.toLowerCase())).filter(a => !co || (a.company || '').toLowerCase().includes(co))
+            if (!hits.length) return 'No logged application matches that. Ask which one they mean, or log it first.'
+            if (hits.length > 1 && !co) return `Several match: ${hits.slice(0, 4).map(a => `${a.title} at ${a.company || '?'}`).join('; ')}. Ask which.`
+            const a = hits[0]
+            await supabase.from('newpage_applications').update({ status: input.status, status_at: new Date().toISOString() }).eq('id', a.id).eq('member_id', member.id)
+            a.status = input.status
+            return `Updated: ${a.title}${a.company ? ' at ' + a.company : ''} is now ${input.status}.`
+          }
+          if (name === 'set_weekly_target') {
+            const next = await patchApplySettings(member, { weeklyTarget: input.n })
+            return next.weeklyTarget ? `Target recorded: ${next.weeklyTarget} a week. It shows on their Today tab.` : 'Target removed.'
+          }
+          if (name === 'record_apply_offer') {
+            if (!OFFER_ANSWERS.includes(input.answer)) return 'Answer must be yes, no or later.'
+            const offer = recordOffer(data.applySettings.offer, { answer: input.answer, stage: data.apply.stage, patterns: data.apply.patterns })
+            await patchApplySettings(member, { offer })
+            return 'Recorded.'
           }
           return 'Unknown tool.'
         }

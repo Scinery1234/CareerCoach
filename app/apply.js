@@ -22,7 +22,7 @@ async function refresh(ctx) {
 }
 
 // After any apply_* action the server returns the whole `me` payload: keep the app's copy fresh.
-function absorb(ctx, d) { if (d && d.pipeline !== undefined) { ctx.S.me.pipeline = d.pipeline; ctx.S.me.applySettings = d.applySettings } }
+function absorb(ctx, d) { if (d && d.pipeline !== undefined) { ctx.S.me.pipeline = d.pipeline; ctx.S.me.applySettings = d.applySettings; ctx.S.me.apply = d.apply } }
 
 async function setStatus(ctx, app, status) {
   try { const d = await ctx.call('/api/newpage/app', { action: 'apply_update', id: app.id, status }); absorb(ctx, d); app.status = status; L.note = `${app.title}: ${STATUS[status]}.` } catch (e) { L.err = e.message }
@@ -80,6 +80,23 @@ export function pipelineCard(me, go) {
     h('button', { class: 'link-btn blue', type: 'button', onclick: () => go('tools', 'apply') }, 'See all applications'))
 }
 
+// ── Sky's offer, on Today ──
+// Shown once when they reach the applying stage and Sky has not offered yet. "Not now"
+// is remembered on the server, so it stays away on every device; Sky may raise it again
+// later if something changes.
+export function offerCard(ctx) {
+  const me = ctx.S.me, a = me.apply
+  if (!a || a.decision !== 'offer' || a.offer) return null
+  const answer = async ans => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_offer_set', answer: ans }); absorbAll(ctx, d) } catch (e) { L.err = e.message } ctx.render() }
+  return h('div', { class: 'card ap-offer' },
+    h('span', { class: 'label' }, 'Sky can help with applying'),
+    h('p', { class: 'small' }, 'Track what you send, see what comes back, and talk through what gets in the way. Only if you want it.'),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => { await answer('yes'); ctx.askCoach('applying', 'I’d like help with the applying side. ') } }, 'Talk to Sky'),
+      h('button', { class: 'link-btn', type: 'button', onclick: () => answer('later') }, 'Not now')))
+}
+function absorbAll(ctx, d) { if (d && d.me !== undefined) return; if (d && d.pipeline !== undefined) { ctx.S.me.pipeline = d.pipeline; ctx.S.me.applySettings = d.applySettings; ctx.S.me.apply = d.apply } }
+
 // ── The tool ──
 function row(ctx, a) {
   const open = L.editing === a.id
@@ -123,6 +140,20 @@ function addForm(ctx) {
     h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Add'), h('button', { class: 'link-btn', type: 'button', onclick: () => { L.adding = false; ctx.render() } }, 'Cancel')))
 }
 
+function skyCard(ctx) {
+  const a = ctx.S.me.apply, s = ctx.S.me.applySettings || {}
+  const set = async body => { try { const d = await ctx.call('/api/newpage/app', body); absorb(ctx, d); L.note = 'Saved.' } catch (e) { L.err = e.message } ctx.render() }
+  const o = a?.offer
+  const said = o ? (o.answer === 'yes' ? `You said yes on ${fmt(o.at)}.` : o.answer === 'no' ? `You said no on ${fmt(o.at)}${(o.count || 1) >= 2 ? ', twice, so Sky has stopped offering' : ''}.` : `You said not now on ${fmt(o.at)}.`) : 'Sky hasn’t offered yet.'
+  return h('div', { class: 'card' }, h('span', { class: 'label' }, 'Sky and your applications'),
+    h('p', { class: 'small muted' }, 'Sky can see this list and may offer to help with the applying side: what gets in the way, keeping going after a rejection, a rhythm if you want one. ', said),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => ctx.askCoach('applying', 'I’d like to talk about my applications. ') }, 'Talk to Sky about applying'),
+      o && o.answer !== 'yes' && h('button', { class: 'link-btn blue', type: 'button', onclick: () => set({ action: 'apply_offer_set', answer: 'reset' }) }, 'Let Sky offer again'),
+      (!o || o.answer !== 'no') && h('button', { class: 'link-btn', type: 'button', onclick: () => set({ action: 'apply_offer_set', answer: 'no' }) }, 'Don’t offer')),
+    h('label', { class: 'row ap-switch' }, h('input', { type: 'checkbox', ...(s.emails ? { checked: '' } : {}), onchange: e => set({ action: 'apply_settings_set', emails: e.target.checked }) }), h('span', { class: 'small' }, 'A short note from Sky on Sunday evenings about the week’s applications. Off unless you turn it on.')))
+}
+
 function targetCard(ctx) {
   const save = async v => { try { const d = await ctx.call('/api/newpage/app', { action: 'apply_settings_set', weeklyTarget: v }); absorb(ctx, d); L.target = d.applySettings?.weeklyTarget || ''; L.note = L.target ? `Target set: ${L.target} a week.` : 'No weekly target.' } catch (e) { L.err = e.message } ctx.render() }
   return h('div', { class: 'card' }, h('span', { class: 'label' }, 'A weekly rhythm, if you want one'),
@@ -147,5 +178,6 @@ export function applyScreen(ctx) {
       : !list.length ? h('div', { class: 'card' }, h('p', { class: 'small muted' }, 'Nothing logged yet. Tailor a resume or write a cover letter and you’ll be asked whether you applied.'),
         h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => ctx.go('tools', 'resume') }, 'Open the resume writer')))
       : groups.filter(([, g]) => g.length).map(([name, g]) => h('div', { class: 'ap-group' }, h('h3', { class: 'group' }, `${name} (${g.length})`), h('ul', { class: 'ap-list' }, g.map(a => row(ctx, a))))),
-    targetCard(ctx))
+    targetCard(ctx),
+    skyCard(ctx))
 }

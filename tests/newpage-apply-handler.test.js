@@ -73,7 +73,7 @@ test('status changes, notes, and the list; another member sees nothing', async (
   assert.equal(r.body.applications.length, 1)
   assert.equal(r.body.applications[0].status, 'interview')
   assert.equal(r.body.applications[0].notes, 'Tuesday')
-  assert.deepEqual(r.body.settings, { weeklyTarget: null })
+  assert.deepEqual(r.body.settings, { weeklyTarget: null, offer: null, emails: false })
   r = await act({ action: 'apply_list' }, OTHER)
   assert.equal(r.body.applications.length, 0)
   r = await act({ action: 'apply_update', id, status: 'rejected' }, OTHER)
@@ -120,4 +120,66 @@ test('delete removes an entry, and the pipeline goes with it', async () => {
   const r = await act({ action: 'apply_delete', id: a.body.application.id })
   assert.equal(r.code, 200)
   assert.equal(r.body.pipeline.total, 0)
+})
+
+// ── Phase 2 ──
+test('me() says where they are and whether Sky should offer; the Today card’s answers are kept', async () => {
+  await act({ action: 'apply_add', title: 'Cook', company: 'Cafe' })
+  let r = await act({ action: 'me' })
+  assert.equal(r.body.apply.stage, 'applying')
+  assert.equal(r.body.apply.decision, 'offer')
+  assert.equal(r.body.apply.offer, null)
+  r = await act({ action: 'apply_offer_set', answer: 'later' })
+  assert.equal(r.body.apply.offer.answer, 'later')
+  assert.equal(r.body.apply.decision, 'none', 'not now: quiet for a fortnight')
+  r = await act({ action: 'apply_settings_set', weeklyTarget: 2 })
+  assert.equal(r.body.apply.offer.answer, 'later', 'setting the target does not wipe the offer record')
+  assert.equal(r.body.applySettings.weeklyTarget, 2)
+  r = await act({ action: 'apply_offer_set', answer: 'no' })
+  assert.equal(r.body.apply.offer.count, 1)
+  r = await act({ action: 'apply_offer_set', answer: 'reset' })
+  assert.equal(r.body.apply.offer, null)
+  assert.equal(r.body.apply.decision, 'offer')
+  r = await act({ action: 'apply_settings_set', emails: true })
+  assert.equal(r.body.applySettings.emails, true)
+  assert.equal(r.body.apply.emails, true)
+})
+
+test('Sky’s tools log, update, set the target and record the offer', async () => {
+  // Drive the coach action's tool runner directly, the way runCoach would, with the model stubbed.
+  const { runCoach } = await import('../lib/newpage-coach.js')
+  assert.equal(typeof runCoach, 'function')
+  process.env.ANTHROPIC_API_KEY = 'sk-test'
+  const calls = [{ name: 'log_application', input: { title: 'Barista', company: 'Beanz', board: 'seek' } }, { name: 'log_application', input: { title: 'Barista', company: 'Beanz' } },
+    { name: 'update_application', input: { title: 'barista', status: 'interview' } }, { name: 'update_application', input: { title: 'Nothing like this', status: 'rejected' } },
+    { name: 'set_weekly_target', input: { n: 3 } }, { name: 'record_apply_offer', input: { answer: 'yes' } }, { name: 'record_apply_offer', input: { answer: 'maybe' } }]
+  // runCoach allows three tool rounds per reply, so the calls go in batches of three, one coach message each.
+  const batches = [calls.slice(0, 3), calls.slice(3, 6), calls.slice(6)]
+  let batch = null, n = 0
+  const results = []
+  const origFetch = globalThis.fetch
+  globalThis.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body)
+    const last = body.messages[body.messages.length - 1]
+    if (Array.isArray(last.content) && last.content[0]?.type === 'tool_result') results.push(...last.content.map(c => c.content))
+    const c = batch.shift()
+    if (c) return new Response(JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't' + (++n), name: c.name, input: c.input }] }), { status: 200 })
+    return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Done.' }] }), { status: 200 })
+  }
+  try {
+    for (const b of batches) { batch = [...b]; const r = await act({ action: 'coach', message: 'I applied for the barista job at Beanz' }); assert.equal(r.code, 200, JSON.stringify(r.body)) }
+  } finally { globalThis.fetch = origFetch; delete process.env.ANTHROPIC_API_KEY }
+  assert.match(results[0], /^Logged: Barista at Beanz, applied \d{4}-\d{2}-\d{2}\.$/)
+  assert.match(results[1], /^Already logged: Barista at Beanz/)
+  assert.match(results[2], /^Updated: Barista at Beanz is now interview\.$/)
+  assert.match(results[3], /No logged application matches/)
+  assert.match(results[4], /Target recorded: 3 a week/)
+  assert.equal(results[5], 'Recorded.')
+  assert.match(results[6], /yes, no or later/)
+  const r = await act({ action: 'apply_list' })
+  const b = r.body.applications.find(a => a.title === 'Barista')
+  assert.equal(b.status, 'interview')
+  assert.equal(b.board, 'seek')
+  assert.equal(r.body.settings.weeklyTarget, 3)
+  assert.equal(r.body.settings.offer.answer, 'yes')
 })

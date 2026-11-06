@@ -405,3 +405,6 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
 .ap-group { margin-top: 8px; }
 .ap-target input { max-width: 120px; }
 .ok { color: var(--ok, #2e7d4f); }
+.ap-offer { border-color: var(--ink); }
+.ap-switch { align-items: flex-start; gap: 10px; cursor: pointer; }
+.ap-switch input { margin-top: 4px; }

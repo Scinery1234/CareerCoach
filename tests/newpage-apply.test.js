@@ -87,11 +87,14 @@ test('a patch only carries what was asked for', () => {
 })
 
 test('settings: the weekly target is a whole number from 1 to 50, or none', () => {
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 3 }), { weeklyTarget: 3 })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: '4' }), { weeklyTarget: 4 })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 0 }), { weeklyTarget: null })
-  assert.deepEqual(cleanApplySettings({ weeklyTarget: 500 }), { weeklyTarget: null })
-  assert.deepEqual(cleanApplySettings(null), { weeklyTarget: null })
+  const base = { offer: null, emails: false }
+  assert.deepEqual(cleanApplySettings({ weeklyTarget: 3 }), { weeklyTarget: 3, ...base })
+  assert.deepEqual(cleanApplySettings({ weeklyTarget: '4' }), { weeklyTarget: 4, ...base })
+  assert.deepEqual(cleanApplySettings({ weeklyTarget: 0 }), { weeklyTarget: null, ...base })
+  assert.deepEqual(cleanApplySettings({ weeklyTarget: 500 }), { weeklyTarget: null, ...base })
+  assert.deepEqual(cleanApplySettings(null), { weeklyTarget: null, ...base })
+  assert.deepEqual(cleanApplySettings({ offer: { answer: 'no', at: '2026-11-01', stage: 'ready', patterns: ['x'], count: 1 }, emails: true }).offer, { answer: 'no', at: '2026-11-01', stage: 'ready', patterns: ['x'], count: 1 })
+  assert.equal(cleanApplySettings({ offer: { answer: 'maybe' } }).offer, null)
 })
 
 test('the personal fields are the ones that get sealed', () => {

@@ -3,7 +3,7 @@ import { h, todayStr } from './ui.js'
 import { plannerScreen } from './planner.js'
 import { compassScreen, compassStatus, COMPASS_STEPS } from './compass.js'
 import { docsScreen } from './docs.js'
-import { applyScreen, pipelineCard } from './apply.js'
+import { applyScreen, pipelineCard, offerCard } from './apply.js'
 import { sessionScreen } from './session.js'
 import { sectionsScreen, sectionKinds } from './sections.js'
 import { openSky, skySeen } from './sky.js'
@@ -269,6 +269,8 @@ function todayScreen() {
     p.complete && h('div', { class: 'soft' }, h('b', {}, 'You’ve done your four weeks. '), 'Retake the check-in to see how far you’ve moved, and talk to Sky about what’s next.'),
     h('div', { class: 'today-grid' },
     gettingStarted(me),
+    offerCard(ctx),
+    pipelineCard(me, go),
     h('div', { class: 'week-card' },
       h('div', { class: 'week-head' }, h('h2', {}, `Week ${p.week}: ${week.title}`), h('span', { class: 'pill' }, `${p.doneThisWeek} of ${p.totalThisWeek} done`)),
       h('p', { class: 'muted' }, week.goal),
@@ -327,6 +329,7 @@ function toolsToday(me, first) {
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky'),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Open the Compass'))),
       gettingStarted(me),
+      offerCard(ctx),
       pipelineCard(me, go),
       u && h('div', { class: 'card' }, h('span', { class: 'label' }, 'This month'),
         h('p', { class: 'small' }, `Sky: ${u.used.messages} of ${u.caps.messages} messages · resumes: ${u.used.resumes} of ${u.caps.resumes} · tailored: ${u.used.tailored || 0} of ${u.caps.tailored} · cover letters: ${u.used.covers} of ${u.caps.covers}. Everything else is unlimited. Resets on the 1st.`)),
