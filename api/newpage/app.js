@@ -19,7 +19,7 @@ import { getAvailableSlots } from '../../lib/availability.js'
 import { sessionState, bookingProblem } from '../../lib/newpage-members.js'
 import { sendConfirmation } from '../../lib/resend.js'
 import { stripe, renewSessionParams, hoursSessionParams } from '../../lib/newpage-stripe.js'
-import { cleanHours } from '../../lib/newpage-pricing.js'
+import { cleanHours, PRICE } from '../../lib/newpage-pricing.js'
 import { createOutlookEvent } from '../../lib/outlook.js'
 import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
 import {
@@ -84,7 +84,8 @@ async function load(member, coach = 'career') {
     supabase.from('newpage_progress').select('week, step').eq('member_id', memberId),
     supabase.from('newpage_tasks').select('id, title, due, done, source, created_at, block_start, block_mins, goal_id').eq('member_id', memberId).order('created_at', { ascending: true }).limit(200),
     supabase.from('newpage_checkins').select('clarity, capacity, quadrant, created_at').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
-    supabase.from('newpage_memory').select('id, note').eq('member_id', memberId).order('created_at', { ascending: true }).limit(60),
+    // Newest first so the window is the latest notes, then put back in time order for the prompt.
+    supabase.from('newpage_memory').select('id, note').eq('member_id', memberId).order('created_at', { ascending: false }).limit(MEMORY_LIMIT),
     supabase.from('newpage_messages').select('role, content, created_at').eq('member_id', memberId).eq('coach', coach).order('id', { ascending: false }).limit(40),
     supabase.from('newpage_goals').select('id, title, target, done').eq('member_id', memberId).order('created_at', { ascending: true }).limit(50),
     supabase.from('bookings').select('id, date, start_time, status').eq('newpage_member_id', memberId).limit(100),
@@ -105,7 +106,7 @@ async function load(member, coach = 'career') {
     alerts: { count: alertRows.filter(a => a.state === 'new').length, open: alertRows.length, top: alertRows.slice(0, 5).map(a => ({ ...a, words: fitWords(a.fit) })) },
     dismissals,
     tasks: (tasks.data || []).map(t => ({ id: t.id, title: t.title, due: t.due, done: t.done, source: t.source, goalId: t.goal_id || null, start: t.block_start ? String(t.block_start).slice(0, 5) : null, mins: t.block_mins || null })), checkins: checkins.data || [],
-    memory: (memory.data || []).map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
+    memory: (memory.data || []).reverse().map(m => ({ id: m.id, note: openText(vault, 'mem', m.note) })),
     messages: (messages.data || []).map(m => ({ ...m, content: openText(vault, 'msg', m.content) })).reverse()
   }
 }
@@ -160,11 +161,18 @@ export default async function handler(req, res) {
   // month-by-month renewal. Sessions with a human coach are bought and booked under Tools.
   if (isTools(member)) {
     if (b.action === 'renew_checkout') return res.status(403).json({ error: 'Your membership renews by itself each month. Change your card or cancel under Me.', code: 'tools' })
-    const kind = b.action === 'coach' ? 'messages' : b.action === 'resume_tailor' ? 'tailored' : (b.action === 'cover_draft' || (b.action === 'doc_generate' && b.kind === 'cover')) ? 'covers' : null
+    // A cover letter counts once, when the finished letter is saved (doc_generate), not at the first draft.
+    const kind = b.action === 'coach' ? 'messages' : b.action === 'resume_tailor' ? 'tailored' : (b.action === 'doc_generate' && b.kind === 'cover') ? 'covers' : null
     if (kind) {
       const a = await usageAllowance(member, kind)
       if (!a.ok) return res.status(429).json({ error: a.why, code: 'usage_cap', used: a.used, cap: a.cap })
-      await usageSpend(member, kind)
+      // Spend only when a successful reply goes out, so a failed, filtered or rejected request costs nothing.
+      const sendJson = res.json.bind(res)
+      res.json = async body => {
+        res.json = sendJson
+        if (res.statusCode < 400 && body && !body.error && !body.crisis) await usageSpend(member, kind).catch(err => console.error('Usage spend failed:', err))
+        return sendJson(body)
+      }
     }
     if (b.action === 'billing_portal') {
       if (!member.stripe_customer_id) return res.status(400).json({ error: 'We can’t find your billing details. Reply to any email from us and we’ll sort it out.' })
@@ -177,7 +185,7 @@ export default async function handler(req, res) {
     if (['renew_checkout', 'hours_checkout', 'session_book', 'reminders_set', 'program_emails_set', 'share_chat', 'share_context'].includes(b.action)) {
       return res.status(403).json({ error: 'That part isn’t in the demo. Join AI Career Coach to use it.', code: 'demo' })
     }
-    if (b.action === 'coach' || (b.action === 'doc_generate') || b.action === 'doc_edit' || b.action === 'compass_suggest') {
+    if (['coach', 'doc_generate', 'doc_edit', 'compass_suggest', 'resume_tailor', 'cover_analyse', 'cover_draft', 'cover_review', 'cover_revise'].includes(b.action)) {
       const kind = b.action === 'coach' ? 'messages' : 'docs'
       const a = await demoAllowance(member.id, kind)
       if (!a.ok) return res.status(429).json({ error: a.why, code: 'demo_cap', used: a.used, cap: a.cap })
@@ -186,6 +194,7 @@ export default async function handler(req, res) {
     }
   }
 
+  try {
   switch (b.action) {
     case 'me':
       return res.json(await me(member, coachOf(b.coach)))
@@ -266,10 +275,16 @@ export default async function handler(req, res) {
       if (!task) return res.status(400).json({ error: 'Unknown suggestion.' })
       if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Suggestions aren’t switched on yet.', code: 'coach_off' })
       if (!rateLimit(req, res, { max: 40, windowMs: 60 * 60 * 1000, key: `np-compass-${member.id}` })) return
+      const compass = cleanCompass(b.compass), data = b.data && typeof b.data === 'object' ? b.data : {}
+      const notReady = task.ready(compass, data)
+      if (notReady) return res.status(400).json({ error: notReady })
       try {
-        const compass = cleanCompass(b.compass)
-        const out = await askJson({ system: COMPASS_SYSTEM, prompt: task.prompt(compass, b.data || {}), schema: task.schema })
-        return res.json({ result: task.read(out) })
+        const run = async () => task.read(await askJson({ system: COMPASS_SYSTEM, prompt: task.prompt(compass, data), schema: task.schema }), compass, data)
+        let result = await run()
+        // Everything came back as a repeat (or short): ask once more before giving up.
+        if (task.empty?.(result)) result = await run()
+        if (task.empty?.(result)) return res.status(502).json({ error: 'Nothing new came back. Try again, or write your own.' })
+        return res.json({ result })
       } catch (err) {
         console.error('Compass suggestion failed:', err)
         return res.status(502).json({ error: aiMessage(err) })
@@ -684,7 +699,7 @@ export default async function handler(req, res) {
       const time = `${String(hour).padStart(2, '0')}:00`
       const { data: booking, error } = await supabase.from('bookings').insert({
         client_id: client.id, session_type_id: type.id, date, start_time: time, duration_mins: type.duration_mins,
-        meet_link: process.env.ZOOM_PERSONAL_LINK, amount_cents: 0, tier: 'free', status: 'confirmed', newpage_member_id: member.id,
+        meet_link: process.env.ZOOM_PERSONAL_LINK, amount_cents: isTools(member) ? PRICE.hourCents : 0, tier: isTools(member) ? 'full_rate' : 'free', status: 'confirmed', newpage_member_id: member.id,
         notes: 'AI Career Coach included session'
       }).select().single()
       if (error || !booking) { console.error('Session booking failed:', error); return res.status(500).json({ error: 'Could not book that. Please try again.' }) }
@@ -948,5 +963,10 @@ export default async function handler(req, res) {
 
     default:
       return res.status(400).json({ error: 'Unknown action' })
+  }
+  } catch (err) {
+    if (err?.status) return res.status(err.status).json({ error: err.message })
+    console.error(`${b.action} failed:`, err)
+    return res.status(500).json({ error: 'Something went wrong. Please try again in a minute.' })
   }
 }

@@ -64,6 +64,12 @@ test('crisis words are caught whatever the punctuation', () => {
   assert.ok(detectCrisis("I dont want to live"))
   assert.ok(detectCrisis('thinking about SELF-HARM'))
   assert.ok(!detectCrisis('I need a new job and a plan'))
+  assert.ok(!detectCrisis("I don't want to live in Sydney any more"))
+  assert.ok(!detectCrisis('my boss will kill me if I overdose on coffee'))
+  assert.ok(!detectCrisis('cutting myself off from the team'))
+  assert.ok(detectCrisis('I just want to disappear and never wake up'))
+  assert.ok(detectCrisis('everyone would be better off without me'))
+  assert.ok(detectCrisis('I keep thinking about ending it'))
   assert.match(CRISIS_REPLY, /13 11 14/)
 })
 

@@ -2,14 +2,14 @@ import { supabase } from '../../lib/supabase.js'
 import { sendReminder24h, sendReminder1h, sendFollowUp, sendPaymentPlanReceipt } from '../../lib/resend.js'
 import { syncCalendarAvailability } from '../../lib/calendar-sync.js'
 import Stripe from 'stripe'
+import { cronAuthorised } from '../../lib/security.js'
+import { sydneyInstant } from '../../lib/newpage-members.js'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  if (!cronAuthorised(req)) return res.status(401).json({ error: 'Unauthorized' })
 
   const now = new Date()
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
@@ -24,7 +24,9 @@ export default async function handler(req, res) {
   const sent = { reminder24h: 0, reminder1h: 0, followup: 0 }
 
   for (const booking of bookings ?? []) {
-    const sessionStart = new Date(`${booking.date}T${booking.start_time}`)
+    // start_time is a Sydney wall-clock time; the server runs in UTC.
+    const [hh, mm = 0] = String(booking.start_time).split(':').map(Number)
+    const sessionStart = new Date(sydneyInstant(booking.date, hh) + mm * 60000)
     const sessionEnd   = new Date(sessionStart.getTime() + booking.duration_mins * 60000)
 
     const diff24 = Math.abs(sessionStart - in24h)

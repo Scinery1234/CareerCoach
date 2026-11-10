@@ -212,7 +212,7 @@ function tailorView(ctx, doc) {
     a && h('div', { class: 'tl-before' }, h('span', { class: 'tl-tag' }, 'Before'), h('p', {}, a)),
     b && h('div', { class: 'tl-after' }, h('span', { class: 'tl-tag' }, 'After'), h('p', {}, b)))
   return h('div', { class: 'card tl-result', id: 'tl-result' },
-    h('div', { class: 'row review-head' }, h('span', { class: 'label' }, doc.title),
+    h('div', { class: 'row review-head' }, h('h3', { class: 'doc-title' }, doc.title),
       h('button', { class: 'link-btn blue', type: 'button', onclick: () => { L.tail = null; L.mode = 'tailor'; L.tailJob = ''; L.tailJobFile = ''; L.tailRole = ''; L.tailCo = ''; L.err = ''; ctx.render() } }, 'Tailor for another job')),
     h('p', { class: 'small muted' }, `Saved${base ? `, under “${base.title}”` : ''}. Your original resume is untouched. `, renameLink(ctx, doc)),
     renameForm(ctx, doc),

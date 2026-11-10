@@ -73,7 +73,7 @@
 .sticky .btn { min-height: 48px; font-size: 16px; padding: 8px 18px; white-space: nowrap; }
 .sticky span { font-size: 14px; font-weight: 600; }
 .t0 { display: none; } body.notrial .t7 { display: none; } body.notrial .t0 { display: initial; }
-@media (min-width: 760px) {
+@media (min-width: 900px) {
   .hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; align-items: start; }
   .hero > .shot { grid-column: 2; grid-row: 1 / span 4; margin-top: 8px; }
   .cta .btn-primary { width: auto; }
@@ -204,7 +204,7 @@ const V = {
   resume: null,
   direction: ['Not sure what’s next? Work it out with a coach that remembers you.', 'The Compass takes you from your values and strengths to a direction and three first steps, in ten short goes. Sky remembers all of it, so every conversation picks up where the last one ended. When you’re ready to apply, the resume and letters are there too.'],
   stuck: ['Applying, hearing nothing, losing steam?', 'Most generic resumes never reach a person. Tailor yours to each ad in about a minute, nothing invented, then a cover letter from your own proof. And a coach for the days it all feels like too much.'],
-  interview: ['Practise the interview before the interview.', 'Sky runs the questions a real panel would ask for the role, out loud or in writing, and tells you plainly what landed and what didn’t. It remembers your answers, so the next run starts stronger. Resume and letters included.']
+  interview: ['Practise the interview before the interview.', 'Sky asks the questions a real panel would ask for the role, one at a time, and tells you plainly what landed and what didn’t. It remembers your answers, so the next run starts stronger. Resume and letters included.']
 }
 const v = new URLSearchParams(location.search).get('v')
 if (V[v]) { document.getElementById('h1').textContent = V[v][0]; document.getElementById('lead').textContent = V[v][1] }

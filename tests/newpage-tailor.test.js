@@ -79,6 +79,7 @@ test('a role whose achievements were gutted keeps the originals, and garbage is 
 
 test('titles, stored shape and the match summary', () => {
   assert.equal(tailoredTitle('Ops Lead', 'Acme'), 'Resume: Ops Lead at Acme')
+  assert.equal(tailoredTitle('Senior Policy Officer (Housing and Homelessness Strategy), Department of Communities and Justice', 'DCJ'), 'Resume: Senior Policy Officer (Housing and Homelessness… at DCJ')
   assert.equal(tailoredTitle('', ''), 'Resume: tailored')
   const content = cleanStoredResume({ resume: BASE, target_title: 'Ops Lead', job_description: 'ad', tailored: { base_id: '123e4567-e89b-12d3-a456-426614174000', role: 'Ops Lead', company: 'Acme', summary: 's', changes: [{ section: 'key_skills', kind: 'reordered', what: 'w', before: 'a', after: 'b' }], match: [{ requirement: 'r', status: 'strong', evidence: 'e', note: '' }], junk: 1 } })
   assert.equal(content.tailored.base_id, '123e4567-e89b-12d3-a456-426614174000')

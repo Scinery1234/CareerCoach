@@ -91,7 +91,7 @@ function sentScreen() {
     h('span', { class: 'note' }, 'check your email'),
     h('h2', {}, 'We’ve sent a link to ', h('span', { class: 'hl' }, S.email)),
     h('p', {}, 'Open it on this device to sign in. It works for 15 minutes. If you don’t see it, check your junk folder.'),
-    h('p', { class: 'small muted' }, 'If that email isn’t a AI Career Coach member, no email is sent, and nothing in this screen will tell you either way.'),
+    h('p', { class: 'small muted' }, 'If that email isn’t an AI Career Coach member, no email is sent, and nothing in this screen will tell you either way.'),
     h('button', { class: 'link-btn', type: 'button', onclick: () => { S.screen = 'login'; render() } }, 'Use a different email'))
 }
 
@@ -228,7 +228,6 @@ function openLesson(id) {
 
 async function openCoach(id) {
   S.coach = id; S.coachError = ''; S.crisis = false
-  if (S.me) S.me.messages = []
   go('coach')
   try { await act('me') } catch (e) { S.error = e.message }
   render(); scrollChat()
@@ -321,6 +320,7 @@ function toolsToday(me, first) {
   const due = me.tasks.filter(t => !t.done && t.due && t.due <= today)
   const u = me.usage
   return h('section', { class: 'screen' },
+    S.error && h('p', { class: 'error', role: 'alert' }, S.error),
     h('div', { class: 'today-grid' },
       h('div', { class: 'week-card' },
         h('div', { class: 'week-head' }, h('h2', {}, first ? `Hi ${first}.` : 'Hi.'), h('span', { class: 'pill' }, 'Member')),
@@ -422,19 +422,19 @@ function coachScreen() {
     h('p', { class: 'small muted' }, `${info.blurb} Sky is an AI. It’s coaching, not therapy, and it can’t replace a human coach.`),
     me.member.memoryRestored && !S.restoredSeen && h('p', { class: 'soft', role: 'status' }, 'Welcome back. Sky remembers you, and your chats and notes are exactly as you left them.'),
     !me.member.privacy && h('div', { class: 'tool-callout' },
-      h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what your coach can see, and tell Sky about you: your resume, your Myers-Briggs type and more. Sky keeps notes as you chat, so you never repeat yourself.')),
+      h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what a human coach could see, and tell Sky about you: your resume, your Myers-Briggs type and more. Sky keeps notes as you chat, so you never repeat yourself.')),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'context') }, 'Set up Sky')),
     !me.coachOn && h('p', { class: 'soft' }, 'The coach isn’t switched on yet. Everything else in AI Career Coach works.'),
     S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'),
       h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),
     h('div', { class: 'msgs', id: 'msgs' },
-      me.messages.length ? me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.content))
+      me.messages.length ? me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.role === 'assistant' ? inline(m.content) : m.content))
         : h('div', { class: 'msg assistant' }, `Hi${me.member.name ? ' ' + me.member.name.split(' ')[0] : ''}. ${info.open}`),
       S.coachSending && h('div', { class: 'msg assistant typing', 'aria-label': 'Sky is typing' }, '···')),
     !me.messages.length && h('div', { class: 'starters' }, starters.map(s => h('button', { class: 'chip', type: 'button', onclick: () => send(s) }, s))),
     S.coachError && h('p', { class: 'error', role: 'alert' }, S.coachError),
     h('form', { class: 'composer', onsubmit: e => { e.preventDefault(); send(S.coachDraft) } },
-      h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type a message…', 'aria-label': 'Message Sky', disabled: S.coachSending || !me.coachOn, oninput: e => { S.coachDraft = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; const sendBtn = document.getElementById('coach-send'); if (sendBtn) sendBtn.disabled = S.coachSending || !S.coachDraft.trim() },
+      h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type a message…', 'aria-label': 'Message Sky', disabled: !me.coachOn, oninput: e => { S.coachDraft = e.target.value; const was = e.target.style.height; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; if (e.target.style.height !== was) scrollChat(); const sendBtn = document.getElementById('coach-send'); if (sendBtn) sendBtn.disabled = S.coachSending || !S.coachDraft.trim() },
         onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(S.coachDraft) } } }, S.coachDraft),
       h('button', { id: 'coach-send', class: 'btn btn-primary', type: 'submit', disabled: S.coachSending || !me.coachOn || !S.coachDraft.trim() }, 'Send')),
     me.messages.length > 0 && shareBlock(me),
@@ -484,9 +484,9 @@ const TOOL_GROUPS = [
     ['outreach', 'Outreach messages', 'Ask for a conversation, follow up, and say thank you.']]],
   ['A human coach', [
     ['session', 'Book a session', 'A 60-minute online session with a human career coach, when you want a person.'],
-    ['brief', 'Session brief', 'Four questions so your coach can start on what matters.']]],
+    ['brief', 'Session brief', 'Four questions so the coach can start on what matters.']]],
   ['Sky and your privacy', [
-    ['context', 'Your context', 'What Sky knows about you, what your coach can see, and your controls.']]],
+    ['context', 'Your context', 'What Sky knows about you, what a human coach can see, and your controls.']]],
   ['Stay on track', [
     ['planner', 'Planner', 'Tasks, time blocks, goals and a morning reminder.'],
     ['notes', 'Notes', 'A private place to type and work things out.'],
@@ -635,7 +635,7 @@ function renderDemoBar() {
   if (!demoBar) { demoBar = h('div', { class: 'demobar', role: 'region', 'aria-label': 'Demo' }); document.body.prepend(demoBar); document.body.classList.add('has-demobar') }
   const left = Math.max(0, Math.round((new Date(d.until) - Date.now()) / 3600e3))
   demoBar.replaceChildren(
-    h('span', {}, h('b', {}, 'Demo'), ` · sample member “Sam”, Launch program · ${left}h left · Sky: ${Math.max(0, d.caps.messages - d.messagesUsed)} of ${d.caps.messages} messages left`),
+    h('span', {}, h('b', {}, 'Demo'), ` · sample member “Sam” · ${left}h left · Sky: ${Math.max(0, d.caps.messages - d.messagesUsed)} of ${d.caps.messages} messages left`),
     h('span', { class: 'demobar-actions' },
       h('button', { class: 'demobar-btn', type: 'button', onclick: () => { S.feedbackOpen = !S.feedbackOpen; S.feedbackSent = false; render() } }, 'Give feedback'),
       h('a', { class: 'demobar-btn solid', href: '/join' }, 'Join AI Career Coach')))

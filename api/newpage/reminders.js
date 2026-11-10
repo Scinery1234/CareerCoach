@@ -1,6 +1,7 @@
 import { sendMail } from '../../lib/newpage-mail.js'
 import { supabase } from '../../lib/supabase.js'
 import { reminderEmail } from '../../lib/newpage-emails.js'
+import { cronAuthorised } from '../../lib/security.js'
 
 const sydneyDate = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(now)
 
@@ -8,7 +9,7 @@ const sydneyDate = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { time
 // who has reminders on and something due today (or overdue and still open).
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' })
+  if (!cronAuthorised(req)) return res.status(401).json({ error: 'Unauthorized' })
 
   const today = sydneyDate()
   const { data: tasks, error } = await supabase.from('newpage_tasks')

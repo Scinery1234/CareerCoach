@@ -1,6 +1,7 @@
 // The apply_* actions of the member endpoint, run against the in-memory Supabase.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { fakeSupabase } from './helpers/fake-supabase.js'
 
 process.env.JWT_SECRET = 'test-secret'
@@ -9,6 +10,7 @@ process.env.SUPABASE_SERVICE_KEY = 'k'
 process.env.SUPABASE_ANON_KEY = 'k'
 process.env.RESEND_API_KEY ||= 're_test'
 process.env.STRIPE_SECRET_KEY ||= 'sk_test'
+process.env.NEWPAGE_MEMORY_KEY ||= randomBytes(32).toString('base64') // member data is only stored encrypted
 delete process.env.ANTHROPIC_API_KEY
 
 const ME = { id: '11111111-1111-4111-8111-111111111111', email: 'sam@example.com', name: 'Sam', status: 'active', source: 'purchase', plan_started_at: new Date().toISOString() }
@@ -108,7 +110,8 @@ test('Sky’s prompt gets one line about applications and where they live', () =
 
 test('export includes applications; delete removes them and the apply settings', async () => {
   await act({ action: 'apply_settings_set', weeklyTarget: 2 })
-  const out = await exportMemory(ME)
+  const row = db.rows('newpage_members').find(m => m.id === ME.id) // the stored member, with the key that was made when they first saved
+  const out = await exportMemory(row)
   assert.equal(out.applications.length, 1)
   assert.equal(out.applications[0].title, 'Support Worker')
   assert.equal(out.applications[0].status, 'interview')

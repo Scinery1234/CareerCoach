@@ -6,6 +6,7 @@ and prints the path. `execute.py` runs it in a separate Python process.
 """
 import inspect
 import pprint
+import re
 
 from .filename import sanitise_filename
 
@@ -259,10 +260,7 @@ def build_script(data, fallback_title=""):
     """Complete Python source for the approved, normalised resume `data`."""
     name = (data.get("candidate") or {}).get("full_name") or "the candidate"
     name = "".join(ch for ch in name if ch.isalnum() or ch in " .'-") or "the candidate"
-    # Data goes in last so resume text can never be mistaken for a placeholder.
-    return (
-        _TEMPLATE.replace("__NAME__", name)
-        .replace("__SANITISE__", inspect.getsource(sanitise_filename))
-        .replace("__FALLBACK__", repr(fallback_title or ""))
-        .replace("__DATA__", pprint.pformat(data, width=110, sort_dicts=False))
-    )
+    # One pass over the template: a placeholder inside substituted text (a title of "__DATA__", say) is never re-read.
+    parts = {"NAME": name, "SANITISE": inspect.getsource(sanitise_filename), "FALLBACK": repr(fallback_title or ""),
+             "DATA": pprint.pformat(data, width=110, sort_dicts=False)}
+    return re.sub(r"__(NAME|SANITISE|FALLBACK|DATA)__", lambda m: parts[m.group(1)], _TEMPLATE)

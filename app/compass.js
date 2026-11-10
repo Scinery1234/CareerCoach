@@ -7,11 +7,14 @@ export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need',
 
 const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '' }
 
+// "I am" + whatever they typed. A leading article is lower-cased, and so is a single
+// capitalised word ("Learner"); longer input is left as typed so names keep their capitals.
 const iam = s => {
-  s = String(s || '').trim().replace(/^i\s*am\s*/i, '').trim()
+  s = String(s || '').trim().replace(/^i\s*am\s*/i, '').replace(/[.\s]+$/, '').trim()
   if (!s) return ''
-  if (/^(a|an)\s/i.test(s)) return 'I am ' + s.replace(/^(a|an)\s+/i, m => m.toLowerCase())
-  return 'I am ' + (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s
+  if (/^(a|an)\s/i.test(s)) s = s.replace(/^(a|an)\s+/i, m => m.toLowerCase())
+  else if (/^[A-Z][a-z]+$/.test(s)) s = s.toLowerCase()
+  return 'I am ' + s
 }
 
 let saveTimer = null
@@ -125,8 +128,8 @@ export function compassScreen(ctx) {
       addRow(ctx, 'cp-value', 'Missing one? Add your own', v => { if (C.values.length < 10 && !C.values.includes(v)) C.values.push(v); save(ctx) }),
       C.values.length > 0 && [h('span', { class: 'label' }, 'Your values in order'), rankList(C.values, rr, 'Your values in order')])
   } else if (step === 1) {
-    body.push(h('h3', {}, 'Who are you?'), h('p', { class: 'muted' }, 'Write some “I am a…” or “I am an…” statements: who you’ve been, who you are now, or who you’d love to be. Think about all of your life, not just work. Then put them in order of what feels most true today.'),
-      addRow(ctx, 'cp-iam', 'e.g. mum, gardener, artist, teacher', v => { const t = iam(v); if (t && !C.iAm.includes(t) && C.iAm.length < 12) C.iAm.push(t); save(ctx) }, 'I am a/an'),
+    body.push(h('h3', {}, 'Who are you?'), h('p', { class: 'muted' }, 'Finish the sentence “I am…” a few times, like “I am a mum” or “I am curious”: who you’ve been, who you are now, or who you’d love to be. Think about all of your life, not just work. Then put them in order of what feels most true today.'),
+      addRow(ctx, 'cp-iam', 'e.g. a mum, a gardener, curious', v => { const t = iam(v); if (t && !C.iAm.includes(t) && C.iAm.length < 12) C.iAm.push(t); save(ctx) }, 'I am'),
       C.iAm.length > 0 && rankList(C.iAm, rr, 'Your I am statements in order'))
   } else if (step === 2) {
     const wc = h('div', { class: 'small muted', id: 'cp-wc' }, `${words(C.north)} words`)
@@ -147,28 +150,35 @@ export function compassScreen(ctx) {
       h('div', { class: 'field' }, h('label', { for: 'cp-other' }, 'Anything else that has to be true? (optional)'), h('textarea', { id: 'cp-other', rows: '2', maxlength: '300', placeholder: 'e.g. School pick-up on Wednesdays', oninput: e => { N.other = e.target.value; quiet() } }, N.other)))
   } else if (step === 4) {
     const G = C.strengths
-    const cats = [['know', 'Things I know', 'Topics, places, cultures, industries, life experience', 'e.g. Gardening, NDIS, Tamil culture'], ['do', 'Things I can do', 'Skills, practical or people-based', 'e.g. Calm people down, fix bikes, write'], ['love', 'Things I love', 'What makes your heart sing, or your blood boil', 'e.g. Kids’ wellbeing, live music, fairness'], ['other', 'Other things I bring (optional)', 'People you know, places you can access, things you own', 'e.g. A big local network, a ute']]
+    const cats = [['know', 'Things I know', 'Topics, places, cultures, industries, life experience', 'e.g. Gardening, NDIS'], ['do', 'Things I can do', 'Skills, practical or people-based', 'e.g. Fix bikes, write'], ['love', 'Things I love', 'What makes your heart sing, or your blood boil', 'e.g. Live music, fairness'], ['other', 'Other things I bring (optional)', 'People you know, places you can access, things you own', 'e.g. A ute, a big network']]
     body.push(h('h3', {}, 'Your strengths'), h('p', { class: 'muted' }, 'Three groups: what you know, what you can do, and what you love. At least three in each. More is better.'),
       h('div', { class: 'mixgrid' }, cats.map(([k, label, hint, ph]) => h('div', { class: 'card' }, h('span', { class: 'label' }, label, k !== 'other' && h('small', {}, ` ${G[k].length}/3`)), h('p', { class: 'small muted' }, hint), tagList(G[k], rr), addRow(ctx, 'cp-s-' + k, ph, v => { if (G[k].length < 20 && !G[k].includes(v)) G[k].push(v); save(ctx) })))))
   } else if (step === 5) {
     const G = C.strengths
     if (!T.trios.length || T.trios.some(t => !G.know.includes(t.know) || !G.do.includes(t.do) || !G.love.includes(t.love))) T.trios = makeTrios(G)
     const addIdea = (v, t) => { if (v && !C.ideas.includes(v) && C.ideas.length < 30) { C.ideas.push(v); if (t) t.added.push(v) } }
+    // Remix keeps anything typed but not yet added, so nothing is lost.
+    const remix = () => { for (const t of T.trios) { const v = t.idea.trim(); if (v) addIdea(v, t) } T.trios = makeTrios(G); T.showAll = false; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
+    const shown = T.showAll ? T.trios : T.trios.slice(0, 5)
     body.push(h('h3', {}, 'Mix and match'), h('p', { class: 'muted' }, 'Each card mixes one thing you know, one you can do and one you love. Ask: what job or kind of work could bring these together? Skip any that don’t spark anything. Add the ideas you already had too.'),
-      h('div', { class: 'mixgrid' }, T.trios.map((t, j) => h('div', { class: 'card mix' },
+      h('div', { class: 'card' }, h('span', { class: 'label' }, 'Ideas you already had'), h('p', { class: 'small muted' }, 'Any job or career you’ve thought about before, even years ago. Bank them first.'),
+        addRow(ctx, 'cp-idea', 'e.g. Paramedic, opening a café', v => { addIdea(v); save(ctx) })),
+      h('div', { class: 'mixgrid' }, shown.map((t, j) => h('div', { class: 'card mix' },
         h('div', { class: 'trio' }, h('span', {}, t.know), '+', h('span', {}, t.do), '+', h('span', {}, t.love)),
         t.added.length > 0 && h('div', { class: 'tags' }, t.added.map(v => h('span', { class: 'tag got' }, '✓ ' + v))),
         h('div', { class: 'add-row' },
           h('input', { id: 'cp-mix-' + j, type: 'text', maxlength: '100', placeholder: t.added.length ? 'Another idea?' : 'What work could this be?', 'aria-label': `Idea for mix ${j + 1}`, value: t.idea, oninput: e => { t.idea = e.target.value }, onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addIdea(t.idea.trim(), t); t.idea = ''; rr() } } }),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { addIdea(t.idea.trim(), t); t.idea = ''; rr() } }, 'Add')),
         h('button', { class: 'link-btn blue', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'mixIdea', { know: t.know, do: t.do, love: t.love, avoid: [...t.added, ...C.ideas] }, 'mix' + j); if (r?.idea) { t.idea = r.idea; ctx.render() } } }, T.busy === 'mix' + j ? 'Thinking…' : 'Suggest an idea for this mix')))),
-      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.trios = makeTrios(G); ctx.render(); window.scrollTo({ top: 0 }) } }, 'Remix: 10 new mixes'),
+      h('div', { class: 'row' },
+        !T.showAll && T.trios.length > 5 && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.showAll = true; ctx.render() } }, `Show ${T.trios.length - 5} more`),
+        h('button', { class: 'btn btn-secondary', type: 'button', onclick: remix }, 'Remix: 10 new mixes')),
       h('div', { class: 'card' }, h('span', { class: 'label' }, `Your ideas (${C.ideas.length})`),
         tagList(C.ideas, rr) || h('p', { class: 'muted small' }, 'Ideas you add appear here.'),
-        addRow(ctx, 'cp-idea', 'An idea you already had', v => { addIdea(v); save(ctx) }),
         h('button', { class: 'btn btn-secondary', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'ideas', {}, 'ideas'); if (r?.ideas) { T.sugg = r.ideas; ctx.render() } } }, T.busy === 'ideas' ? 'Thinking…' : 'Suggest 5 more ideas from my answers'),
         (T.sugg || []).map(s => h('div', { class: 'sugg' }, h('b', {}, s.title), h('p', { class: 'small muted' }, `${s.know} + ${s.do} + ${s.love}. ${s.why}`),
-          h('button', { class: 'chip', type: 'button', disabled: C.ideas.includes(s.title), onclick: () => { addIdea(s.title); rr() } }, C.ideas.includes(s.title) ? 'Added' : 'Add to my ideas')))))
+          h('button', { class: 'chip', type: 'button', disabled: C.ideas.includes(s.title), onclick: () => { addIdea(s.title); rr() } }, C.ideas.includes(s.title) ? 'Added' : 'Add to my ideas'),
+          h('button', { class: 'link-btn', type: 'button', 'aria-label': `Dismiss ${s.title}`, onclick: () => { T.sugg = T.sugg.filter(x => x !== s); ctx.render() } }, 'No thanks')))))
   } else if (step === 6) {
     body.push(h('h3', {}, 'Choose your direction'), h('p', { class: 'muted' }, 'Notice which ideas light you up. Choose your top pick, and a second if you like. You can always change your mind.'),
       C.ideas.length ? h('div', { class: 'card' }, C.ideas.map(v => h('div', { class: 'pick' }, h('span', {}, v),
@@ -195,14 +205,14 @@ export function compassScreen(ctx) {
       T.sched.map((s, i) => h('div', { class: 'card' }, h('p', {}, h('b', {}, s.title)),
         h('div', { class: 'when' }, h('input', { type: 'date', value: s.date, 'aria-label': `Date for step ${i + 1}`, oninput: e => { s.date = e.target.value } }), h('input', { type: 'time', value: s.time, 'aria-label': `Time for step ${i + 1}`, oninput: e => { s.time = e.target.value } })))),
       !steps.length && h('p', { class: 'muted' }, 'Go back and add your first steps.'),
-      steps.length > 0 && (T.placed
+      steps.length > 0 && (C.placed
         ? h('p', { class: 'soft' }, 'Added to your planner. ', h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.go('tools', 'planner') }, 'Open the planner'))
         : h('button', { class: 'btn btn-primary', type: 'button', disabled: T.busy === 'place', onclick: async () => {
             T.busy = 'place'; ctx.render()
-            try { for (const s of T.sched) await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); T.placed = true; C.done = true; save(ctx) } catch (e) { T.err = e.message }
+            try { for (const s of T.sched) await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); C.placed = true; C.done = true; save(ctx) } catch (e) { T.err = e.message }
             T.busy = ''; ctx.render()
           } }, T.busy === 'place' ? 'Adding…' : 'Add to my planner')),
-      C.done && summary(ctx, C))
+      steps.length > 0 && summary(ctx, C))
   }
 
   const footer = h('div', { class: 'cp-footer' }, h('p', { class: 'small muted', id: 'cp-hint', 'aria-live': 'polite' }),
@@ -226,9 +236,14 @@ export function compassScreen(ctx) {
     footer)
 }
 
+function needsLine(n) {
+  const parts = [n.pay ? `at least $${Number(n.pay).toLocaleString('en-AU')} a year` : '', n.hours ? `up to ${n.hours} hours a week` : '', n.stress ? `${n.stress.toLowerCase()} stress` : '', n.mode ? n.mode.toLowerCase() : '', n.location].filter(Boolean)
+  return parts.join(', ') + (n.other ? `. ${n.other}` : '')
+}
 function summary(ctx, C) {
   const text = [
     `My values: ${C.values.join(', ')}`, `I am: ${C.iAm.join('; ')}`, `My North Star: ${C.north}`,
+    `What I need from work: ${needsLine(C.needs)}`,
     `Direction: ${C.first}${C.second ? ` (second: ${C.second})` : ''}`,
     `Now: ${C.plan.now}`, `Building: ${C.plan.building}`, `The move: ${C.plan.move}`, `Longer term: ${C.plan.longer}`,
     `First steps: ${C.actions.filter(Boolean).join('; ')}`
@@ -237,8 +252,11 @@ function summary(ctx, C) {
     h('dl', { class: 'kv' },
       h('dt', {}, 'Values'), h('dd', {}, C.values.slice(0, 5).join(', ')),
       h('dt', {}, 'I am'), h('dd', {}, C.iAm.slice(0, 3).join('; ')),
+      h('dt', {}, 'I need'), h('dd', {}, needsLine(C.needs) || '—'),
       h('dt', {}, 'Direction'), h('dd', {}, C.first || '—')),
     h('p', { class: 'small' }, C.north),
-    h('button', { class: 'btn btn-secondary', type: 'button', onclick: e => copyText(text, e.currentTarget) }, 'Copy my Compass'),
-    h('p', { class: 'small muted' }, 'Sky knows your direction and values. Bring this to your session with your coach.'))
+    h('div', { class: 'row' },
+      h('button', { class: 'btn btn-secondary', type: 'button', onclick: e => copyText(text, e.currentTarget) }, 'Copy my Compass'),
+      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = 'my-compass.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000) } }, 'Download as text')),
+    h('p', { class: 'small muted' }, 'Sky knows your direction and values. If you book a session with a human coach, bring this along.'))
 }

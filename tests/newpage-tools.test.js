@@ -56,7 +56,23 @@ test('Compass prompts only use the person’s own words and never ask for judgem
     assert.ok(p.includes('<person>'), k)
   }
   assert.ok(/mixIdea/.test(Object.keys(COMPASS_TASKS).join()))
-  assert.deepEqual(COMPASS_TASKS.steps.read({ steps: ['a', '', 'b', 'c', 'd'] }).steps, ['a', 'b', 'c'])
+  assert.deepEqual(COMPASS_TASKS.steps.read({ step1: ' a ', step2: '', step3: 'c' }).steps, ['a', 'c'])
+  assert.ok(COMPASS_TASKS.steps.empty({ steps: ['a', 'c'] }))
+  assert.deepEqual(Object.keys(COMPASS_TASKS.steps.schema.properties), ['step1', 'step2', 'step3'])
+})
+
+test('Compass ideas get the needs as a fit filter, without pay, and repeats are dropped', () => {
+  const c = cleanCompass({ ideas: ['Solar trainer'], needs: { pay: '90000', hours: '38', stress: 'Low', mode: 'On-site', location: 'Gold Coast', other: 'School pick-up on Wednesdays' }, strengths: { know: ['Solar'], do: ['Teach'], love: ['Kids'] } })
+  const p = COMPASS_TASKS.ideas.prompt(c)
+  assert.match(p, /Things the work has to fit: up to 38 hours a week, low stress, on-site, Gold Coast. Also: School pick-up on Wednesdays/)
+  assert.match(p, /lowest pay \$90000/, 'the person block still has pay')
+  assert.doesNotMatch(p.slice(p.indexOf('Things the work has to fit')), /90000/)
+  const out = COMPASS_TASKS.ideas.read({ ideas: [{ title: 'solar trainer' }, { title: 'School electrician', know: 'Solar' }, { title: 'SCHOOL ELECTRICIAN' }] }, c)
+  assert.deepEqual(out.ideas.map(i => i.title), ['School electrician'])
+  assert.equal(COMPASS_TASKS.mixIdea.read({ idea: 'Florist' }, c, { avoid: ['florist'] }).idea, '')
+  assert.equal(COMPASS_TASKS.ideas.ready(cleanCompass({})), 'Add at least one thing you know, can do and love first.')
+  assert.equal(COMPASS_TASKS.ideas.ready(c), null)
+  assert.doesNotMatch(COMPASS_TASKS.plan.prompt(cleanCompass({ first: 'Gardener' })), /\$ a year|Second choice/)
 })
 
 test('cover letter: keywords, requirements and prompt', () => {
@@ -215,4 +231,14 @@ test('an AI failure gives the member a useful message, and the log gets the real
   assert.match(aiMessage({ status: 404 }), /model/)
   assert.match(aiMessage({ status: 429 }), /busy/)
   assert.match(aiMessage(new Error('x')), /try again in a minute/)
+})
+
+test('askJson does not retry a genuine 400', async () => {
+  const saved = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => { calls++; return new Response(JSON.stringify({ error: { message: 'prompt is too long' } }), { status: 400 }) }
+  try {
+    await assert.rejects(() => askJson({ system: 's', prompt: 'p', schema: {} }), /too long/)
+    assert.equal(calls, 1)
+  } finally { globalThis.fetch = saved }
 })

@@ -18,7 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import doc_builder as rb  # noqa: E402  (copied unchanged from Resume-Generator)
 import cover_builder as cb  # noqa: E402
-from np_auth import session_claims, verify_session  # noqa: E402,F401  (re-exported for tests)
+from np_auth import session_claims, verify_session  # noqa: E402,F401  (verify_session re-exported for tests)
+from np_usage import member_access  # noqa: E402
 from resume_agent.extract import extract_text  # noqa: E402,F401
 
 MAX_BODY = 4_000_000
@@ -47,6 +48,9 @@ class handler(BaseHTTPRequestHandler):
         claims = session_claims(str(b.get("token") or ""))
         if not claims:
             return respond(self, 401, {"error": "Please sign in again.", "code": "auth"})
+        ok, why = member_access(str(claims.get("sub")))
+        if not ok:
+            return respond(self, 403, {"error": why, "code": "expired"})
 
         action = b.get("action")
         # The browser helper's token may only build a cover letter file.
@@ -57,7 +61,10 @@ class handler(BaseHTTPRequestHandler):
             if action == "templates":
                 return respond(self, 200, {"templates": rb.TEMPLATE_LIST})
             if action == "extract":
-                text = extract_text(str(b.get("filename") or ""), base64.b64decode(b.get("file") or ""))
+                content = base64.b64decode(b.get("file") or "")
+                if len(content) > 3 * 1024 * 1024:
+                    return respond(self, 413, {"error": "That file is over 3 MB. Save a smaller copy or paste the text."})
+                text = extract_text(str(b.get("filename") or ""), content)
                 if len(text.strip()) < 40:
                     return respond(self, 422, {"error": "We couldn’t read any text in that file. If it’s a scan or a picture, paste the text instead."})
                 return respond(self, 200, {"text": text[:30000]})

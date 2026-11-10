@@ -71,7 +71,8 @@ button, input { font: inherit; color: inherit; }
 }
 @media (min-width: 680px) { .top-in { padding-left: 64px; padding-right: 32px; } }
 .brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); }
-.brand span { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -.4px; }
+.brand span { font-family: var(--display); font-weight: 700; font-size: clamp(15px, 5vw, 21px); letter-spacing: -.4px; white-space: nowrap; }
+@media (max-width: 359px) { .top-in { gap: 8px; } .top-link, .top-link.plain { font-size: 13px; } }
 .count { font-size: 14px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .progress { max-width: 600px; margin: 0 auto; padding: 0 max(20px, env(safe-area-inset-right, 0px)) 10px 48px; }
 @media (min-width: 680px) { .progress { padding-left: 64px; padding-right: 32px; } }
@@ -94,7 +95,7 @@ p { margin: 0; }
 .lead { font-size: 18px; }
 .muted { color: var(--muted); }
 .small { font-size: 14px; }
-.label { font-size: 12px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.label { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
 
 /* Buttons */
 .btn {
@@ -108,7 +109,7 @@ p { margin: 0; }
 .btn-secondary { background: #FFFFFF; color: var(--ink); border: 2px solid var(--ink); font-size: 17px; min-height: 52px; }
 .btn-secondary:hover { background: var(--paper-2); color: var(--ink); }
 .btn[disabled] { opacity: .6; cursor: progress; }
-.link-btn { align-self: flex-start; min-height: 44px; border: 0; background: transparent; padding: 0; color: var(--muted); font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.link-btn { align-self: flex-start; min-height: 44px; min-width: 44px; border: 0; background: transparent; padding: 0 6px; margin: 0 -6px; color: var(--muted); font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
 .link-btn.blue { color: var(--link); text-decoration: underline; }
 .inline-link { border: 0; background: none; padding: 0; color: var(--link); text-decoration: underline; cursor: pointer; font: inherit; }
 
@@ -176,7 +177,7 @@ p { margin: 0; }
 .foot a { color: var(--muted); }
 
 /* Program page (/) */
-.top-link { font-weight: 700; font-size: 15px; color: var(--ink); text-decoration: none; border-bottom: 3px solid var(--hl); padding-bottom: 1px; }
+.top-link { font-weight: 700; font-size: 15px; color: var(--ink); text-decoration: none; border-bottom: 3px solid var(--hl); padding-bottom: 1px; text-align: right; }
 .top-link:hover { color: var(--ink); background: var(--hl); }
 .prog-hero { padding-top: 28px; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -223,3 +224,6 @@ p { margin: 0; }
 .quote { margin: 0; background: #fff; border: 1.5px solid var(--rule); border-left: 5px solid var(--hl); border-radius: 14px; padding: 18px 20px; }
 .quote p { margin: 0 0 10px; font-size: 17px; line-height: 1.55; }
 .quote cite { font-style: normal; font-weight: 700; font-size: 14px; color: var(--muted); }
+
+/* Very narrow effective widths (a phone at 150% browser zoom): keep the icon, drop the brand text. */
+@media (max-width: 300px) { .brand span { display: none; } }

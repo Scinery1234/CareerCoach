@@ -41,19 +41,19 @@ export function contextScreen(ctx) {
 
   // 1. Who can see what
   const privacy = h('div', { class: 'card' },
-    h('span', { class: 'label' }, '1. What can your coach see?'),
-    h('p', { class: 'small muted' }, 'Sky always uses what it knows to coach you. This is about your coach, your human coach.'),
+    h('span', { class: 'label' }, 'What can a human coach see?'),
+    h('p', { class: 'small muted' }, 'Sky always uses what it knows to coach you. This is about the human coach, if you book a session with one.'),
     h('div', { class: 'radios', role: 'radiogroup', 'aria-label': 'What your coach can see' }, ['private', 'share', 'all'].map(k => h('button', {
       type: 'button', role: 'radio', 'aria-checked': String(c.privacy === k), class: 'radio-card' + (c.privacy === k ? ' on' : ''),
       onclick: async () => { await run(ctx, 'privacy_set', { level: k }, 'Saved.'); ctx.render() }
     }, h('b', {}, c.privacyText[k].title), h('span', {}, c.privacyText[k].body)))),
-    !c.privacy && h('p', { class: 'small' }, 'Until you choose, your coach can see nothing.'),
-    c.views.length > 0 && h('p', { class: 'small muted' }, `Your coach last looked at ${c.views[0].what} on ${fmt(c.views[0].created_at)}.`),
-    c.privacy && c.views.length === 0 && c.privacy !== 'private' && h('p', { class: 'small muted' }, 'Your coach hasn’t looked at anything yet. When he does, it shows here.'))
+    !c.privacy && h('p', { class: 'small' }, 'Until you choose, a human coach can see nothing.'),
+    c.views.length > 0 && h('p', { class: 'small muted' }, `The coach last looked at ${c.views[0].what} on ${fmt(c.views[0].created_at)}.`),
+    c.privacy && c.views.length === 0 && c.privacy !== 'private' && h('p', { class: 'small muted' }, 'No coach has looked at anything yet. When one does, it shows here.'))
 
   // 2. Share with your coach
   const share = ['share', 'all'].includes(c.privacy) && h('div', { class: 'card' },
-    h('span', { class: 'label' }, 'Share with your coach'),
+    h('span', { class: 'label' }, 'Share with a human coach'),
     c.privacy === 'all' ? h('p', { class: 'small' }, 'Your coach can already read your chats and what Sky has learned, so there’s nothing to share. Choose “Only what I share” if you’d rather decide each time.')
       : [h('p', { class: 'small' }, 'Send your coach a copy of what Sky knows about you: your answers, resume and notes. To share a chat, use “Share this chat with your coach” in the Coach tab.'),
         h('div', { class: 'field' }, h('label', { for: 'sh-note' }, 'A note for your coach (optional)'), h('input', { id: 'sh-note', type: 'text', maxlength: '300', value: L.shareNote, oninput: e => { L.shareNote = e.target.value } })),
@@ -71,7 +71,7 @@ export function contextScreen(ctx) {
     L.uploading = false; ctx.render()
   } })
   const resume = h('div', { class: 'card' },
-    h('span', { class: 'label' }, '2. Your resume'),
+    h('span', { class: 'label' }, 'Your resume'),
     h('p', { class: 'small muted' }, 'Upload a Word or PDF file (on a phone, pick it from Files), or paste it, so Sky knows your background. You can replace or delete it any time.'),
     h('div', { class: 'row' }, fileInput, h('label', { for: 'cx-file', class: 'btn btn-secondary' }, L.uploading ? 'Reading your file…' : c.resume.has ? 'Upload a different file' : 'Upload your resume')),
     h('div', { class: 'field' }, h('label', { for: 'cx-resume', class: 'sr-only' }, 'Your resume text'), h('textarea', { id: 'cx-resume', rows: '6', maxlength: '12000', placeholder: 'Or paste your resume here', oninput: e => { L.resumeText = e.target.value } }, L.resumeText || '')),
@@ -90,7 +90,7 @@ export function contextScreen(ctx) {
     return h('div', { class: 'field' }, h('label', { for: id }, q.label), q.hint && h('p', { class: 'small muted' }, q.hint), input)
   }
   const about = h('div', { class: 'card' },
-    h('span', { class: 'label' }, '3. About you'),
+    h('span', { class: 'label' }, 'About you'),
     h('p', { class: 'small muted' }, 'All optional. The more Sky knows, the less you have to explain.'),
     c.questions.map(field),
     h('button', { class: 'btn btn-primary', type: 'button', disabled: !c.ready, onclick: async () => { await run(ctx, 'about_save', { about: L.about }, 'Saved.'); ctx.render() } }, 'Save my answers'))
@@ -110,7 +110,7 @@ export function contextScreen(ctx) {
 
   // 6. Your data
   const data = h('div', { class: 'card' },
-    h('span', { class: 'label' }, '5. Your data'),
+    h('span', { class: 'label' }, 'Your data'),
     h('p', { class: 'small' }, 'Sky’s memory is encrypted with a key just for you. If your membership ends, we keep it for 30 days (emailing you at 7, 14 and 30 days), then move it to the Trash for 12 months, then delete it for good. Coming back restores it.'),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: async () => { try { const { export: ex } = await ctx.call('/api/newpage/app', { action: 'data_export' }); download('sky-memory.json', JSON.stringify(ex, null, 2), 'application/json'); L.msg = 'Downloaded.' } catch (e) { L.err = e.message } ctx.render() } }, 'Download everything'),

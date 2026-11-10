@@ -3,12 +3,18 @@ import { sendConfirmation } from '../../lib/resend.js'
 import { createOutlookEvent } from '../../lib/outlook.js'
 import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
 import { rateLimit, sanitiseObject } from '../../lib/security.js'
+import { requireAdmin } from '../../lib/auth.js'
+import { slotProblem, recurProblem } from '../../lib/booking-price.js'
+
+const MAX_RECUR = 12
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).end()
 
   if (!rateLimit(req, res, { max: 10, windowMs: 60 * 60 * 1000, key: 'booking-schedule' })) return
+  // Admin only: this creates confirmed, unpaid bookings and sends emails and calendar invites.
+  if (!requireAdmin(req, res)) return
 
   const body = sanitiseObject(req.body)
   const {
@@ -19,6 +25,10 @@ export default async function handler(req, res) {
   if (!clientName || !clientEmail || !sessionTypeId || !date || !time) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
+  const problem = await slotProblem(date, time)
+  if (problem) return res.status(409).json({ error: problem })
+  const recurErr = recurProblem(recurDates, MAX_RECUR)
+  if (recurErr) return res.status(400).json({ error: recurErr })
 
   const { data: sessionType } = await supabase
     .from('session_types')
@@ -82,13 +92,14 @@ export default async function handler(req, res) {
     await supabase.from('bookings').insert(extraRows)
   }
 
-  // If linked to a package, update sessions used
+  // If linked to a package, update sessions used. The package must belong to this client.
   const totalBooked = 1 + allDates.length
   if (packageId) {
     const { data: pkg } = await supabase
       .from('packages')
-      .select('sessions_used, sessions_total')
+      .select('sessions_used, sessions_total, client_id')
       .eq('id', packageId)
+      .eq('client_id', client.id)
       .single()
     if (pkg) {
       await supabase

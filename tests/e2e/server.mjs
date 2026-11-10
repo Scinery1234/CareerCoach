@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { fakeSupabase } from '../helpers/fake-supabase.js'
 process.env.JWT_SECRET = 'e2e'; process.env.SUPABASE_URL = 'http://x'; process.env.SUPABASE_SERVICE_KEY = 'k'; process.env.SUPABASE_ANON_KEY = 'k'; process.env.RESEND_API_KEY = 're'; process.env.STRIPE_SECRET_KEY = 'sk'
+process.env.NEWPAGE_MEMORY_KEY ||= Buffer.from(Array.from({ length: 32 }, (_, i) => i * 7 % 256)).toString('base64') // member data is only stored encrypted
 delete process.env.ANTHROPIC_API_KEY
 const ME = { id: '11111111-1111-4111-8111-111111111111', email: 'sam@example.com', name: 'Sam Lee', status: 'active', source: 'tools', plan_started_at: new Date().toISOString(), sessions_included: 0 }
 const now = new Date().toISOString()

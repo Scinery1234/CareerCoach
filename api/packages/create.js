@@ -5,12 +5,15 @@ import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
 import Stripe from 'stripe'
 import { pricingProblem, slotProblem, recurProblem } from '../../lib/booking-price.js'
 import { ensureClient, lookupClient } from '../../lib/booking-client.js'
+import { rateLimit, isBot } from '../../lib/security.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).end()
+  if (!rateLimit(req, res, { max: 5, windowMs: 60 * 60 * 1000, key: 'package-create' })) return
+  if (isBot(req.body || {})) return res.json({ ok: true })
 
   const {
     clientName, clientEmail, clientPhone,

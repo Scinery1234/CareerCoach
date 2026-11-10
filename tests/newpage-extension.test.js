@@ -2,11 +2,13 @@
 // the hourly limit, and the answer matcher.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { fakeSupabase } from './helpers/fake-supabase.js'
 
 process.env.JWT_SECRET = 'test-secret'
 process.env.SUPABASE_URL = 'http://supabase.test'; process.env.SUPABASE_SERVICE_KEY = 'k'; process.env.SUPABASE_ANON_KEY = 'k'
 process.env.RESEND_API_KEY ||= 're_test'; process.env.STRIPE_SECRET_KEY ||= 'sk_test'
+process.env.NEWPAGE_MEMORY_KEY ||= randomBytes(32).toString('base64') // member data is only stored encrypted
 delete process.env.ANTHROPIC_API_KEY
 
 const ME = { id: '66666666-6666-4666-8666-666666666666', email: 'sam@example.com', name: 'Sam Lee', status: 'active', source: 'purchase', plan_started_at: new Date().toISOString() }

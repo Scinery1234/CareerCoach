@@ -34,6 +34,25 @@ def _rest(method, path, body=None, prefer=None):
     return json.loads(raw) if raw else None
 
 
+def member_access(member_id):
+    """(ok, message). False only when Supabase says the membership is not active or has ended;
+    a network error lets the request through, like the allowance check."""
+    try:
+        rows = _rest("GET", f"newpage_members?id=eq.{urllib.parse.quote(member_id)}&select=status,access_until")
+        if not rows:
+            return False, "Please sign in again."
+        m = rows[0]
+        if m.get("status") != "active":
+            return False, "Your AI Career Coach access has ended."
+        until = m.get("access_until")
+        if until and datetime.datetime.fromisoformat(until.replace("Z", "+00:00")) < datetime.datetime.now(datetime.timezone.utc):
+            return False, "Your AI Career Coach access has ended. Reply to any email from us to renew."
+        return True, ""
+    except Exception as e:
+        print("member access check failed:", repr(e))
+        return True, ""
+
+
 def resume_allowance(member_id):
     """(ok, message). Non-tools members are always ok."""
     try:

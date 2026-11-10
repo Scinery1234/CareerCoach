@@ -41,12 +41,12 @@ export function openSky(ctx) {
     h('div', { class: 'drawer-body' },
       h('p', {}, 'Sky is an AI coach. Pick a focus below for the kind of conversation you need. Sky keeps one memory and one task list across all of them, so you never have to repeat yourself.'),
       !ctx.S.me.member.privacy && h('div', { class: 'tool-callout' },
-        h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what your coach can see, add your resume and tell Sky about you. Sky keeps notes as you chat, so you never repeat yourself.')),
+        h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what a human coach could see, add your resume and tell Sky about you. Sky keeps notes as you chat, so you never repeat yourself.')),
         h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { close(); ctx.go('tools', 'context') } }, 'Set up Sky')),
       h('ul', { class: 'sky-facts' },
-        h('li', {}, 'Sky is an AI. It is not your coach, and it can’t replace your 60-minute session with him.'),
+        h('li', {}, 'Sky is an AI. It isn’t a human coach, and it doesn’t replace one. You can book a session with a person under Tools whenever you want one.'),
         h('li', {}, 'It’s coaching, not therapy. If things get heavy, a helpline near you is at findahelpline.com, any time.'),
-        h('li', {}, 'Sky keeps notes as you chat, without asking. You can see, edit and delete them in Your context, and you choose what your coach can see.')),
+        h('li', {}, 'Sky keeps notes as you chat, without asking. You can see, edit and delete them in Your context, and you choose what a human coach can see.')),
       h('ul', { class: 'focus-list' }, coaches.map(focusCard))))
   back = back || document.body
   const opener = back
