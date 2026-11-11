@@ -307,10 +307,10 @@ function gettingStarted(me) {
   return h('div', { class: 'card gs' },
     h('div', { class: 'week-head' }, h('span', { class: 'label' }, 'Getting started'), h('button', { class: 'link-btn', type: 'button', onclick: () => { try { localStorage.setItem(GS_KEY, '1') } catch {} render() } }, 'Hide')),
     h('ul', { class: 'gs-list' },
+      row(me.messages.length > 0 || !!S.coachUsed, 'Say hello to Sky and tell it about you', 'Say hello', () => go('coach')),
       row(!!me.plan, 'Do your 2-minute check-in', 'Start', () => go('me')),
       me.member.plan !== 'tools' && row(done, 'Tick off your first step below', 'See it', () => window.scrollTo({ top: 0, behavior: 'smooth' })),
-      row(me.messages.length > 0 || !!S.coachUsed, 'Say hello to Sky, your AI Coach', 'Say hello', () => go('coach')),
-      me.member.plan === 'tools' && row(/Finished/.test(compassNote), 'Work out your direction with the Compass', 'Open', () => go('tools', 'compass')),
+      me.member.plan === 'tools' && !me.member.demo && row(/Finished/.test(compassNote), 'Not sure where you’re heading? Try the Compass', 'Open', () => go('tools', 'compass')),
       !me.member.demo && row(me.sessions.upcoming.length > 0, me.member.plan === 'tools' ? 'Want a person in the loop? Book a session with a human coach (optional)' : 'Book your 1:1 with your coach (best in week 2 or 3)', 'Book', () => go('tools', 'session'))))
 }
 
@@ -324,11 +324,11 @@ function toolsToday(me, first) {
     h('div', { class: 'today-grid' },
       h('div', { class: 'week-card' },
         h('div', { class: 'week-head' }, h('h2', {}, first ? `Hi ${first}.` : 'Hi.'), h('span', { class: 'pill' }, 'Member')),
-        h('p', {}, me.plan ? `Your check-in put you in ${me.plan.name}: ${me.plan.meaning}` : 'Do the 2-minute check-in under Me, so Sky knows where you’re starting from.'),
+        h('p', {}, me.plan ? `Your check-in put you in ${me.plan.name}: ${me.plan.meaning}` : 'Talk to Sky and tell it about you, so it knows where you’re starting from. The 2-minute check-in under Me helps too.'),
         due.length ? [h('span', { class: 'label' }, 'Due today'), taskList(due, 6)] : h('p', { class: 'small muted' }, 'Nothing due today. Add tasks in the planner, or ask Sky to help you plan the week.'),
         h('div', { class: 'row' },
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky'),
-          h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Open the Compass'))),
+          h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('tools', 'compass') }, 'Not sure where you’re heading?'))),
       gettingStarted(me),
       alertsCard(ctx),
       offerCard(ctx),
@@ -420,6 +420,7 @@ function coachScreen() {
         h('button', { class: 'chip focus-btn', type: 'button', 'aria-haspopup': 'dialog', onclick: () => openSky(ctx) }, focusIcon(info.id, 26), h('span', { class: 'muted' }, 'Focus: '), h('b', {}, info.name), ' ▾'),
         h('button', { class: 'link-btn blue', type: 'button', onclick: () => openSky(ctx) }, 'What can Sky help with?'))),
     h('p', { class: 'small muted' }, `${info.blurb} Sky is an AI. It’s coaching, not therapy, and it can’t replace a human coach.`),
+    me.member.demo && demoMemory(me),
     me.member.memoryRestored && !S.restoredSeen && h('p', { class: 'soft', role: 'status' }, 'Welcome back. Sky remembers you, and your chats and notes are exactly as you left them.'),
     !me.member.privacy && h('div', { class: 'tool-callout' },
       h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what a human coach could see, and tell Sky about you: your resume, your Myers-Briggs type and more. Sky keeps notes as you chat, so you never repeat yourself.')),
@@ -473,15 +474,15 @@ function scrollChat() { const m = document.getElementById('msgs'); if (m) m.last
 
 // ── Tools ────────────────────────────────────────────────────────
 const TOOL_GROUPS = [
-  ['Your direction', [
-    ['compass', 'The Compass', 'Ten short steps from what matters to you to three first steps.'],
-    ['report', 'Career Direction Report', 'One personal document from your Compass, check-ins and notes.']]],
   ['Get hired', [
     ['resume', 'Resume writer', 'A tailored resume from your own work history and a job ad.'],
     ['cover', 'Cover letter writer', 'A short letter in your voice for one specific job.'],
     ['apply', 'Applications', 'What you’ve applied for and what came back.'],
     ['linkedin', 'LinkedIn profile writer', 'Headline, About, experience and skills, from your own history.'],
     ['outreach', 'Outreach messages', 'Ask for a conversation, follow up, and say thank you.']]],
+  ['Not sure where you’re heading?', [
+    ['compass', 'The Compass', 'Ten short steps from what matters to you to three first steps.'],
+    ['report', 'Career Direction Report', 'One personal document from your Compass, check-ins and notes. Needs a few Compass steps first.']]],
   ['A human coach', [
     ['session', 'Book a session', 'A 60-minute online session with a human career coach, when you want a person.'],
     ['brief', 'Session brief', 'Four questions so the coach can start on what matters.']]],
@@ -510,9 +511,12 @@ function toolsScreen() {
   const status = { session: me.sessions.upcoming.length ? 'Booked' : me.sessions.remaining ? `${me.sessions.remaining} paid for` : `$${me.prices.hourCents / 100} an hour`, planner: due ? `${due} due today` : open ? `${open} open` : '', compass: compassNote, resume: '', cover: '', apply: me.pipeline?.total ? `${me.pipeline.thisWeek} this week` : '', report: '', linkedin: '', outreach: '', brief: '', progress: '' }
   return h('section', { class: 'screen' },
     h('div', {}, h('span', { class: 'note' }, 'your toolkit'), h('h2', {}, 'Tools'), h('p', { class: 'muted' }, 'These save to your account, and Sky knows about your tasks.')),
-    TOOL_GROUPS.map(([group, items]) => [h('h3', { class: 'group' }, group), h('div', { class: 'toolgrid' }, items.map(([id, name, blurb]) =>
-      h('button', { class: 'toolcard', type: 'button', onclick: () => go('tools', id) },
-        h('b', {}, name), h('span', {}, blurb), status[id] && h('small', {}, status[id]))))]),
+    TOOL_GROUPS.map(([group, items]) => [h('h3', { class: 'group' }, group), h('div', { class: 'toolgrid' }, items.map(([id, name, blurb]) => {
+      // The report is written from the Compass and check-ins: until there is something there, it points at the Compass.
+      const held = id === 'report' && !me.checkins.length && !compassNote
+      return h('button', { class: 'toolcard' + (held ? ' held' : ''), type: 'button', onclick: () => go('tools', held ? 'compass' : id) },
+        h('b', {}, name), h('span', {}, blurb), held ? h('small', {}, 'Start the Compass first') : status[id] && h('small', {}, status[id]))
+    }))]),
     h('div', { class: 'card' }, h('span', { class: 'label' }, 'Need to talk something through?'),
       h('p', { class: 'small' }, 'Sky, your AI Coach, is in the Coach tab, with ten focus areas: career, recovery, action, applying, interview, decisions and more.'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go('coach') }, 'Talk to Sky')))
@@ -626,6 +630,39 @@ function render() {
   if (active) { const el = document.getElementById(active); if (el) { el.focus(); if (sel != null && el.setSelectionRange) try { el.setSelectionRange(sel, sel) } catch {} } }
 }
 
+// ── The demo: what Sky knows so far, and the way to keep it ──────────
+// The notes Sky saves while it talks, shown as they appear. Keeping them means joining: the same
+// member carries on, so Sky's memory of them comes along (see applyCheckout).
+const hoursLeft = d => Math.max(0, Math.round((new Date(d.until) - Date.now()) / 3600e3))
+function openKeep() { S.keepOpen = true; S.keepErr = ''; if (S.tab !== 'coach' || S.tool) go('coach'); else render() }
+function demoMemory(me) {
+  const d = me.member.demo, notes = me.memory || []
+  const keep = async e => {
+    e.preventDefault()
+    if (S.keepBusy) return
+    S.keepBusy = true; S.keepErr = ''; render()
+    try {
+      const r = await call('/api/newpage/checkout', { action: 'start', name: (S.keepName || '').trim(), email: (S.keepEmail || '').trim(), demo: session }, null)
+      if (r.url) { location.href = r.url; return }
+      throw new Error('We couldn’t start the payment. Please try again in a minute.')
+    } catch (err) { S.keepErr = err.message }
+    S.keepBusy = false; render()
+  }
+  return h('div', { class: 'card demo-mem', id: 'demo-memory' },
+    h('div', { class: 'row review-head' }, h('span', { class: 'label' }, 'What Sky knows about you'), h('span', { class: 'small muted' }, notes.length ? `${notes.length} thing${notes.length === 1 ? '' : 's'}` : 'nothing yet')),
+    notes.length ? h('ul', { class: 'demo-notes' }, notes.map(n => h('li', {}, n.note)))
+      : h('p', { class: 'small muted' }, 'Talk to Sky and it will start to remember. Whatever it learns shows up here.'),
+    h('p', { class: 'small' }, `This clears itself in about ${hoursLeft(d)} hour${hoursLeft(d) === 1 ? '' : 's'}. Join to keep it, and Sky picks up exactly where you left off.`),
+    !S.keepOpen
+      ? h('button', { class: 'btn btn-primary', type: 'button', onclick: openKeep }, 'Keep what Sky knows')
+      : h('form', { class: 'keep-form', onsubmit: keep },
+        h('div', { class: 'field' }, h('label', { for: 'keep-name' }, 'Your name'), h('input', { id: 'keep-name', type: 'text', autocomplete: 'name', maxlength: '80', required: true, value: S.keepName || '', oninput: e => { S.keepName = e.target.value } })),
+        h('div', { class: 'field' }, h('label', { for: 'keep-email' }, 'Your email'), h('input', { id: 'keep-email', type: 'email', autocomplete: 'email', maxlength: '200', required: true, value: S.keepEmail || '', oninput: e => { S.keepEmail = e.target.value } })),
+        h('p', { class: 'small muted' }, 'Free for 7 days, then $25 a month. Cancel in two taps. You’ll enter your card on Stripe. By continuing you agree to our ', h('a', { href: '/terms', target: '_blank', rel: 'noopener' }, 'Terms'), ' and ', h('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.'),
+        S.keepErr && h('p', { class: 'error', role: 'alert' }, S.keepErr),
+        h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit', disabled: S.keepBusy }, S.keepBusy ? 'Taking you to Stripe…' : 'Keep it'), h('button', { class: 'link-btn', type: 'button', onclick: () => { S.keepOpen = false; render() } }, 'Not now'))))
+}
+
 // ── Demo bar: shows only for demo visitors ──────────────────────────
 let demoBar = null
 const screenName = () => (S.lessonId ? 'lesson' : S.tab === 'tools' && S.tool ? `tools/${S.tool}` : S.tab)
@@ -633,12 +670,12 @@ function renderDemoBar() {
   const d = S.me?.member?.demo
   if (!d || S.screen !== 'app') { demoBar?.remove(); demoBar = null; document.body.classList.remove('has-demobar'); return }
   if (!demoBar) { demoBar = h('div', { class: 'demobar', role: 'region', 'aria-label': 'Demo' }); document.body.prepend(demoBar); document.body.classList.add('has-demobar') }
-  const left = Math.max(0, Math.round((new Date(d.until) - Date.now()) / 3600e3))
+  const left = hoursLeft(d)
   demoBar.replaceChildren(
-    h('span', {}, h('b', {}, 'Demo'), ` · sample member “Sam” · ${left}h left · Sky: ${Math.max(0, d.caps.messages - d.messagesUsed)} of ${d.caps.messages} messages left`),
+    h('span', {}, h('b', {}, 'Demo'), ` · clears in ${left}h unless you keep it · Sky: ${Math.max(0, d.caps.messages - d.messagesUsed)} of ${d.caps.messages} messages left`),
     h('span', { class: 'demobar-actions' },
       h('button', { class: 'demobar-btn', type: 'button', onclick: () => { S.feedbackOpen = !S.feedbackOpen; S.feedbackSent = false; render() } }, 'Give feedback'),
-      h('a', { class: 'demobar-btn solid', href: '/join' }, 'Join AI Career Coach')))
+      h('button', { class: 'demobar-btn solid', type: 'button', onclick: openKeep }, 'Keep what Sky knows')))
   if (S.feedbackOpen) demoBar.append(feedbackForm())
 }
 function feedbackForm() {
@@ -677,7 +714,7 @@ async function start() {
     if (!(await act('me'))) return
     const [wanted, sub] = location.hash.slice(1).split('/')
     if (wanted === 'lesson' && sub) { S.lessonId = sub; S.tab = 'plan' }
-    S.tab = S.lessonId ? 'plan' : TABS.some(([k]) => k === wanted) ? wanted : 'today'
+    S.tab = S.lessonId ? 'plan' : TABS.some(([k]) => k === wanted) ? wanted : (S.me.member.demo ? 'coach' : 'today')  // a demo opens on Sky
     S.tool = S.tab === 'tools' && TOOLS.some(([k]) => k === sub) ? sub : null
     S.screen = 'app'
     const paid = new URL(location.href).searchParams.get('paid')

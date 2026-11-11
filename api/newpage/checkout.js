@@ -3,7 +3,8 @@ import { rateLimit, isBot } from '../../lib/security.js'
 import { PRICE, TRIAL_DAYS } from '../../lib/newpage-pricing.js'
 import { stripe, toolsSessionParams } from '../../lib/newpage-stripe.js'
 import { applyCheckout } from '../../lib/newpage-payments.js'
-import { signSession } from '../../lib/newpage-auth.js'
+import { signSession, readToken } from '../../lib/newpage-auth.js'
+import { keepDemoAlive } from '../../lib/newpage-demo.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const clip = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '')
@@ -32,7 +33,9 @@ export default async function handler(req, res) {
       await applyCheckout(session)
       const email = (session.metadata.email || session.customer_email || '').toLowerCase()
       const { data: member } = await supabase.from('newpage_members').select('id, status, last_login_at, created_at').eq('email', email).maybeSingle()
-      const fresh = member && member.status === 'active' && !member.last_login_at && Date.now() - new Date(member.created_at).getTime() < 3 * 60 * 60 * 1000
+      // A demo visitor who kept their demo: the same member carried on, so sign them straight back in.
+      const kept = !!member && !!session.metadata?.demo_member && member.id === session.metadata.demo_member
+      const fresh = member && member.status === 'active' && (kept || (!member.last_login_at && Date.now() - new Date(member.created_at).getTime() < 3 * 60 * 60 * 1000))
       if (fresh) await supabase.from('newpage_members').update({ last_login_at: new Date().toISOString() }).eq('id', member.id)
       return res.json({ ok: true, email, plan: 'tools', ...(fresh ? { session: signSession(member.id) } : {}) })
     } catch (err) {
@@ -49,8 +52,18 @@ export default async function handler(req, res) {
   const name = clip(b.name, 80)
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Add the email you want to use for AI Career Coach.' })
   if (!name) return res.status(400).json({ error: 'Add your name.' })
+  // Keeping a demo: the visitor's own session says which member, and the email must not already be an account.
+  let demoMember = ''
+  if (typeof b.demo === 'string' && b.demo) {
+    const claims = readToken(b.demo, 'session')
+    const live = claims?.sub ? await keepDemoAlive(claims.sub) : null
+    if (!live) return res.status(400).json({ error: 'That demo has ended, so there’s nothing left to keep. You can still join and start fresh.', code: 'demo_over' })
+    const { data: taken } = await supabase.from('newpage_members').select('id, source').eq('email', email).maybeSingle()
+    if (taken && taken.source !== 'demo') return res.status(409).json({ error: 'That email already has an AI Career Coach account. Sign in with it at /app, or use a different email to keep this demo.', code: 'email_taken' })
+    demoMember = live.id
+  }
   try {
-    const session = await stripe().checkout.sessions.create(toolsSessionParams({ email, name }))
+    const session = await stripe().checkout.sessions.create(toolsSessionParams({ email, name, demoMember }))
     return res.json({ url: session.url })
   } catch (err) {
     console.error('Checkout failed:', err)

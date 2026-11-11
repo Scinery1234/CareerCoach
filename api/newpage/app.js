@@ -868,7 +868,7 @@ export default async function handler(req, res) {
       const current = steerAll[coach] && Date.now() - new Date(steerAll[coach].at).getTime() < 3 * 24 * 60 * 60 * 1000 ? steerAll[coach] : null
       const system = coachSystem({
         member, tasks: data.tasks, memory: data.memory, compass: cp ? cleanCompass(cp) : null, coach,
-        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline,
+        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline, demo: isDemo(member),
         // Same stage as load() found, with the recent tailored resumes' match tables added for the "same gap" pattern.
         apply: withMatches(data, (recent.data || []).map(d => d.content?.tailored?.match).filter(Boolean))
       })

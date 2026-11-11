@@ -52,6 +52,8 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 
 `index.html` is the page ads land on. It carries one message, one button and the product drawn in HTML, with proof next to the button and the objections answered under it. Each ad angle has its own headline: send traffic to `/?v=resume` (default), `/?v=direction`, `/?v=stuck` or `/?v=interview`, so the ad's promise and the headline match. The variant travels to the thank-you page and is sent with the conversion event.
 
+The demo (`/demo`) is the product in miniature. The visitor gets an empty 24-hour member and Sky opens the conversation: it asks who they are and what is on their mind, follows what they say, and saves notes as it goes, which the visitor watches appear under "What Sky knows about you". "Keep what Sky knows" takes a name and email to Stripe; the paid checkout turns that same member into the paid one (`demo_member` in the Stripe metadata, `applyCheckout`), so Sky's memory of them carries over. While they pay, the demo is kept alive for up to three hours, and never past 36 hours from when it started. A demo that is not kept is deleted after 24 hours by the sweep. Limits are in `lib/newpage-demo-config.js`.
+
 Conversion tracking: put your ids in `track.js` (`ga4`, `meta`, or a Google Ads `gadsLabel`). It fires `begin_checkout`/`InitiateCheckout` on the start buttons and `purchase`/`StartTrial` on the join thank-you page. With the ids empty nothing loads.
 
 ## Prices

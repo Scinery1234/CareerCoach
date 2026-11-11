@@ -5,7 +5,11 @@
 // anything that imports lib/supabase.js. It records every call in `calls`.
 import { randomUUID } from 'node:crypto'
 
+// Tables whose id is a numbered identity column in the real database, so ordering by id means "oldest first".
+const IDENTITY = new Set(['newpage_messages', 'newpage_access_log', 'newpage_events'])
+
 export function fakeSupabase(seed = {}) {
+  let nextId = 1000
   const tables = new Map(Object.entries(seed).map(([k, v]) => [k, v.map(r => ({ ...r }))]))
   const calls = []
   const rows = t => { if (!tables.has(t)) tables.set(t, []); return tables.get(t) }
@@ -36,6 +40,8 @@ export function fakeSupabase(seed = {}) {
     function shape(list) {
       if (q.order) list = [...list].sort((a, b) => { const x = a[q.order.k], y = b[q.order.k]; const c = x == null ? 0 : y == null ? 0 : x < y ? -1 : x > y ? 1 : 0; return q.asc === false ? -c : (q.order.asc ? c : -c) })
       if (q.limit != null) list = list.slice(0, q.limit)
+      // Like a real database, hand back copies: changing a row you read must not change the stored row.
+      list = list.map(r => ({ ...r }))
       if (q.mode === 'maybe') return list[0] ?? null
       if (q.mode === 'single') { if (list.length !== 1) throw Object.assign(new Error('single() expects one row'), { code: 'PGRST116' }); return list[0] }
       return list
@@ -53,7 +59,7 @@ export function fakeSupabase(seed = {}) {
               const keys = (q.onConflict || 'id').split(',').map(s => s.trim())
               existing = rows(table).find(r => keys.every(k => r[k] === p[k]))
             }
-            if (existing) { Object.assign(existing, p); out.push(existing) } else { const row = { id: randomUUID(), created_at: new Date().toISOString(), ...p }; rows(table).push(row); out.push(row) }
+            if (existing) { Object.assign(existing, p); out.push(existing) } else { const row = { id: IDENTITY.has(table) ? ++nextId : randomUUID(), created_at: new Date().toISOString(), ...p }; rows(table).push(row); out.push(row) }
           }
           return { data: q.returning ? shape(out) : null, error: null }
         }

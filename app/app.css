@@ -434,3 +434,10 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
   .composer { bottom: calc(44px + env(safe-area-inset-bottom, 0px)); padding: 6px 0 4px; }
   .composer textarea { min-height: 44px; max-height: 88px; }
 }
+
+/* ── The demo: what Sky knows, and keeping it ── */
+.demo-mem { gap: 8px; }
+.demo-notes { margin: 0; padding-left: 18px; max-height: 190px; overflow-y: auto; }
+.demo-notes li { margin: 3px 0; }
+.keep-form { display: flex; flex-direction: column; gap: 10px; }
+.toolcard.held { opacity: .7; border-style: dashed; }

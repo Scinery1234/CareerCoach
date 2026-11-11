@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   const { data: activeCodes } = await supabase.from('newpage_demo_codes').select('code, uses, max_uses').eq('active', true)
   const needsCode = (activeCodes || []).length > 0
 
-  if (b.action === 'info') return res.json({ needsCode, caps: DEMO.caps, hours: DEMO.hours, quadrant: DEMO.quadrant })
+  if (b.action === 'info') return res.json({ needsCode, caps: DEMO.caps, hours: DEMO.hours })
 
   if (b.action === 'start') {
     if (!rateLimit(req, res, { max: 5, windowMs: 60 * 60 * 1000, key: 'np-demo-start' })) return
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       await supabase.from('newpage_demo_codes').update({ uses: row.uses + 1 }).eq('code', code)
     }
     try {
-      // Sample notes and the sample chat are encrypted like a real member's, when encryption is on.
+      // Sky's opening message is encrypted like a real member's, when encryption is on.
       const made = await createDemoMember({ code, seal: null })
       const { data: m } = await supabase.from('newpage_members').select('*').eq('id', made.id).maybeSingle()
       const vault = m ? await openVault(m, { create: true }) : null

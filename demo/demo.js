@@ -1,4 +1,4 @@
-// The demo's front door. One tap makes a 24-hour sample member and opens the app.
+// The demo's front door. One tap makes a 24-hour member and opens the app on Sky.
 const $ = id => document.getElementById(id)
 const KEY = 'np_app_session'
 let needsCode = false
@@ -24,7 +24,7 @@ $('start-form').addEventListener('submit', async e => {
   try {
     const d = await api({ action: 'start', code: $('d-code').value.trim(), website: $('d-website').value })
     try { localStorage.setItem(KEY, d.session); localStorage.setItem('np_sky_seen', '') ; localStorage.removeItem('np_sky_seen') } catch {}
-    location.href = '/app#today'
+    location.href = '/app#coach'
   } catch (ex) {
     err.textContent = ex.message; err.hidden = false
     if (ex.code === 'code') { $('code-field').hidden = false; $('d-code').focus() }
