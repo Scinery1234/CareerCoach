@@ -30,3 +30,17 @@ test('vercel.json pins the framework to none, so the api/*.py files stay separat
   const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
   assert.ok('framework' in v && v.framework === null)
 })
+
+test('the member endpoints load with only the core variables: no Resend, Stripe or Adzuna key needed to start', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const code = `
+    for (const k of Object.keys(process.env)) if (/^(SUPABASE|RESEND|STRIPE|ADZUNA|JWT|CRON|NEWPAGE|ADMIN|FROM|ANTHROPIC)/.test(k)) delete process.env[k]
+    Object.assign(process.env, { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_KEY: 'k', SUPABASE_ANON_KEY: 'k', JWT_SECRET: 'j' })
+    const bad = []
+    for (const f of ['app', 'demo', 'auth', 'checkout', 'extension', 'alerts', 'applycheck', 'reminders', 'retention', 'health']) {
+      try { await import('./api/newpage/' + f + '.js') } catch (e) { bad.push(f + ': ' + e.message.split('\\n')[0]) }
+    }
+    console.log(JSON.stringify(bad))`
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: new URL('../', import.meta.url).pathname, encoding: 'utf8' })
+  assert.deepEqual(JSON.parse(r.stdout.trim().split('\n').pop()), [], r.stderr)
+})
