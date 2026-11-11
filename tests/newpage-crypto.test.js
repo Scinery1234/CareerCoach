@@ -34,7 +34,9 @@ test('values are bound to their member and field, and tampering is caught', () =
   const c = v1.text('msg', 'secret')
   assert.throws(() => v1.read('mem', c), 'another field cannot read it')
   assert.throws(() => v2.read('msg', c), 'another member cannot read it')
-  const flipped = c.slice(0, -2) + (c.endsWith('A') ? 'B' : 'A') + c.slice(-1)
+  // Flip a character in the middle: near the end of base64 a character can hold only padding bits, and changing it changes nothing.
+  const mid = Math.floor(c.length / 2)
+  const flipped = c.slice(0, mid) + (c[mid] === 'A' ? 'B' : 'A') + c.slice(mid + 1)
   assert.throws(() => v1.read('msg', flipped), 'a changed byte is refused')
   const other = makeVault(M1, unwrapKey(newWrappedKey(M1), M1))
   assert.throws(() => other.read('msg', c), 'a different data key cannot read it')

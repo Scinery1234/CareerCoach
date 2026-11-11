@@ -23,3 +23,10 @@ test('the resume file picker has no accept filter (phones can offer only the cam
   }
   assert.ok(!/templatePicker|tmpl-opt/.test(readFileSync('app/resume.js', 'utf8')), 'the resume writer has no style picker')
 })
+
+test('vercel.json pins the framework to none, so the api/*.py files stay separate functions', async () => {
+  // Without it, a project whose dashboard preset is Python (auto-detected from requirements.txt)
+  // fails to build with PYTHON_ENTRYPOINT_NOT_FOUND, because Vercel wants one app entrypoint.
+  const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+  assert.ok('framework' in v && v.framework === null)
+})

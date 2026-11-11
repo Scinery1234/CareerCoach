@@ -24,7 +24,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 
 ## Deploy
 
-1. **Vercel.** New project from this repo, production branch set to this branch. Root is the repo. Python functions need the Python runtime (Vercel picks it up from the `.py` files).
+1. **Vercel.** New project from this repo, production branch `main`. Root is the repo. Leave the Framework Preset on **Other**. Vercel may auto-detect Python from `requirements.txt` and then fail the build with `PYTHON_ENTRYPOINT_NOT_FOUND`; `vercel.json` sets `"framework": null` to prevent that, so each `api/*.py` file stays its own function. Python functions need the Python runtime (Vercel picks it up from the `.py` files).
 2. **Supabase.** New project. Run `sql/schema.sql`, then `sql/newpage.sql`, in the SQL editor.
 3. **Stripe.** A webhook to `https://aicareercoach.net/api/webhooks/stripe` for `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end`. Turn on the Customer Portal (Settings, Billing, Customer portal).
 4. **Resend.** Verify `aicareercoach.net` and set `FROM_EMAIL` on it.
