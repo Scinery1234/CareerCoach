@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo screen mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Figtree:wght@400;500;600;700&family=Caveat:wght@600&display=swap">
+<style>
+  :root { --ink:#15203B; --muted:#56607A; --paper:#fff; --paper-2:#F5F7FB; --rule:#DCE3EE; --rule-line:#EDF1F7; --margin:#FF7A66; --note:#E0523D; --hl:#D4F36B; --link:#1F4FD8; --display:'Familjen Grotesk',ui-sans-serif,system-ui,sans-serif; --body:Figtree,ui-sans-serif,system-ui,sans-serif; --hand:Caveat,'Segoe Print',cursive; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 var(--body); color:var(--ink); background:#E9EDF5; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+
+  /* The page around the mockup */
+  .wrap { max-width:1180px; margin:0 auto; padding:20px 16px 48px; }
+  .intro h1 { font:700 24px/1.2 var(--display); margin:0 0 4px; }
+  .intro p { margin:0 0 14px; color:var(--muted); }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .seg { display:inline-flex; border:2px solid var(--ink); border-radius:12px; overflow:hidden; background:#fff; }
+  .seg button { border:0; background:#fff; padding:8px 16px; font-weight:600; }
+  .seg button.on { background:var(--ink); color:#fff; }
+  .ghost { border:2px solid var(--ink); background:#fff; border-radius:12px; padding:8px 14px; font-weight:600; }
+  .stagewrap { display:flex; justify-content:center; }
+  .notes-list { margin:22px auto 0; max-width:900px; background:#fff; border:1.5px solid var(--rule); border-radius:14px; padding:16px 22px; }
+  .notes-list h2 { font:700 17px var(--display); margin:0 0 6px; }
+  .notes-list li { margin:5px 0; }
+  .small { font-size:13px; color:var(--muted); }
+
+  /* ── The proposed demo screen ── */
+  .stage { background:var(--paper); border:1.5px solid var(--rule); box-shadow:0 10px 30px rgba(21,32,59,.12); overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .stage.desktop { width:min(1100px,100%); height:700px; border-radius:14px; }
+  .stage.phone { width:390px; height:780px; border-radius:38px; border:10px solid #0d1426; }
+  .app { display:flex; flex-direction:column; height:100%; background-color:#fff; background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 31px,var(--rule-line) 31px,var(--rule-line) 32px); position:relative; }
+  .app::before { content:''; position:absolute; top:0; bottom:0; left:40px; width:2px; background:var(--margin); opacity:.55; }
+  .stage.phone .app::before { left:14px; }
+
+  .bar { background:var(--ink); color:#fff; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 20px; font-size:14px; position:relative; z-index:2; }
+  .bar a { color:#fff; font-weight:600; font-size:14px; text-underline-offset:3px; }
+  .top { display:flex; align-items:center; gap:10px; padding:14px 20px 6px 64px; position:relative; z-index:1; }
+  .stage.phone .top { padding:10px 14px 4px 34px; }
+  .brand { font:700 19px var(--display); display:flex; align-items:center; gap:9px; }
+  .brand i { display:inline-block; width:20px; height:24px; border:2px solid var(--ink); border-radius:3px; background:linear-gradient(to bottom,#fff 60%,var(--hl) 60%); }
+
+  .grid { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:22px; padding:6px 24px 16px 64px; position:relative; z-index:1; }
+  .stage.phone .grid { display:block; padding:0 14px 0 34px; }
+
+  /* chat */
+  .chat { display:flex; flex-direction:column; min-height:0; height:100%; }
+  .chat-head { display:flex; align-items:baseline; gap:10px; padding:4px 0 8px; }
+  .chat-head b { font:700 26px var(--display); }
+  .chat-head span { font:600 22px var(--hand); color:var(--note); }
+  .stage.phone .chat-head b { font-size:22px; } .stage.phone .chat-head span { font-size:19px; }
+  .msgs { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding:4px 2px 10px; }
+  .msg { max-width:88%; padding:11px 15px; border-radius:18px; font-size:16px; line-height:1.5; }
+  .msg.assistant { align-self:flex-start; background:#fff; border:1.5px solid var(--rule); border-radius:18px 18px 18px 4px; }
+  .msg.user { align-self:flex-end; background:var(--hl); border:2px solid var(--ink); border-radius:18px 18px 4px 18px; font-weight:500; }
+  .msg.typing { color:var(--muted); letter-spacing:3px; }
+  .starters { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:1.5px solid var(--rule); background:#fff; border-radius:99px; padding:9px 15px; font-size:15px; font-weight:500; }
+  .chip:hover { border-color:var(--ink); }
+  .composer { display:flex; gap:8px; align-items:flex-end; background:#fff; border-top:1.5px solid var(--rule); padding:10px 0 4px; }
+  .composer textarea { flex:1; min-width:0; min-height:50px; max-height:120px; resize:none; border:1.5px solid #C9D3E3; border-radius:14px; padding:12px 14px; font:16px/1.4 var(--body); color:var(--ink); }
+  .btn { border:0; border-radius:12px; font-weight:700; min-height:50px; padding:8px 20px; }
+  .btn-primary { background:var(--ink); color:#fff; box-shadow:0 4px 0 var(--hl); }
+  .btn-secondary { background:#fff; border:2px solid var(--ink); }
+  .fine { margin:6px 0 0; font-size:12px; color:var(--muted); line-height:1.4; }
+
+  /* what Sky knows */
+  .know { background:#fff; border:1.5px solid var(--rule); border-radius:16px; padding:18px; align-self:start; display:flex; flex-direction:column; gap:10px; }
+  .know h2 { margin:0; font:700 12px var(--body); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; }
+  .know h2 em { font-style:normal; font-weight:500; letter-spacing:0; text-transform:none; }
+  #notes { list-style:none; margin:0; padding:0; min-height:132px; }
+  #notes li { margin:0 0 10px; padding:7px 10px; border-radius:10px; font-size:15px; line-height:1.4; border-left:4px solid var(--hl); background:var(--paper-2); }
+  #notes li.new { animation:flash 1.8s ease-out; }
+  #notes li.ph { height:14px; padding:0; border:0; background:linear-gradient(90deg,var(--rule-line),#F7F9FC); width:86%; margin:14px 0; }
+  #notes li.ph:nth-child(2) { width:68%; } #notes li.ph:nth-child(3) { width:76%; }
+  @keyframes flash { 0% { background:var(--hl); transform:translateX(-6px); opacity:.2; } 25% { opacity:1; transform:none; } 100% { background:var(--paper-2); } }
+  .empty { margin:0; font-size:14px; color:var(--muted); }
+  .keep { border-top:1.5px solid var(--rule); padding-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .keep .btn { width:100%; }
+  .keep p { margin:0; font-size:13px; color:var(--muted); line-height:1.4; }
+  .keepform { display:none; flex-direction:column; gap:8px; }
+  .keepform.on { display:flex; }
+  .keepform input { border:1.5px solid #C9D3E3; border-radius:12px; padding:11px 12px; font:16px var(--body); width:100%; }
+  .tools-link { font-size:14px; color:var(--link); }
+
+  /* phone: the panel becomes a pill and a sheet */
+  .pill { display:none; }
+  .stage.phone .chat { height:100%; }
+  .stage.phone .pill { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 6px; padding:9px 14px; border:1.5px solid var(--ink); border-radius:99px; background:#fff; font-weight:600; font-size:14px; }
+  .stage.phone .pill span.dot { width:9px; height:9px; border-radius:50%; background:var(--hl); border:1.5px solid var(--ink); display:inline-block; margin-right:8px; }
+  .stage.phone .know { position:absolute; left:0; right:0; bottom:0; z-index:6; border-radius:22px 22px 0 0; border:0; border-top:2px solid var(--ink); box-shadow:0 -12px 30px rgba(21,32,59,.2); transform:translateY(105%); transition:transform .25s ease; padding:18px 18px 22px; }
+  .stage.phone .know.open { transform:none; }
+  .sheet-close { display:none; }
+  .stage.phone .sheet-close { display:block; border:0; background:none; text-decoration:underline; font-size:14px; align-self:center; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    <h1>Demo screen: proposed layout</h1>
+    <p>This is a working mock. Tap a starter or type a message, then watch the panel. The replies are scripted; the real ones come from Sky.</p>
+  </div>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="Screen size"><button id="v-desktop" class="on">Computer</button><button id="v-phone">Phone</button></div>
+    <button class="ghost" id="replay">Start again</button>
+  </div>
+  <div class="stagewrap">
+    <div class="stage desktop" id="stage">
+      <div class="app">
+        <div class="bar"><span><b>Demo</b> · clears in 24 hours</span><a href="#" onclick="return false">Give feedback</a></div>
+        <div class="top"><span class="brand"><i></i>AI Career Coach</span></div>
+        <div class="grid">
+          <section class="chat">
+            <div class="chat-head"><b>Sky</b><span>your AI career coach</span></div>
+            <div class="msgs" id="msgs">
+              <div class="msg assistant">Hi, I’m Sky, an AI career coach. I remember what you tell me, so I’d like to get to know you. What should I call you, and what’s on your mind about work right now?</div>
+              <div class="starters" id="starters">
+                <button class="chip">I’m looking for work</button>
+                <button class="chip">I want a change</button>
+                <button class="chip">I’m not sure what’s next</button>
+                <button class="chip">I’m stuck</button>
+              </div>
+            </div>
+            <button class="pill" id="pill"><span><span class="dot"></span><span id="pillcount">Sky knows nothing yet</span></span><span>▴</span></button>
+            <form class="composer" id="form">
+              <textarea id="box" rows="1" placeholder="Type your answer…" aria-label="Message Sky"></textarea>
+              <button class="btn btn-primary" type="submit">Send</button>
+            </form>
+            <p class="fine">Sky is an AI. It’s coaching, not therapy. In crisis? Call your local emergency number, or find a helpline at findahelpline.com.</p>
+          </section>
+          <aside class="know" id="know">
+            <h2>What Sky knows about you <em id="count">nothing yet</em></h2>
+            <ul id="notes"><li class="ph"></li><li class="ph"></li><li class="ph"></li></ul>
+            <p class="empty" id="empty">What Sky learns will appear here as you talk.</p>
+            <div class="keep">
+              <button class="btn btn-primary" id="keepbtn" type="button">Keep what Sky knows</button>
+              <form class="keepform" id="keepform" onsubmit="return false">
+                <input placeholder="Your name" aria-label="Your name"><input placeholder="Your email" type="email" aria-label="Your email">
+                <button class="btn btn-primary" type="submit">Keep it</button>
+              </form>
+              <p>This clears itself in about 24 hours. Join to keep it, and Sky picks up where you left off. Free for 7 days, then $25 a month.</p>
+            </div>
+            <a class="tools-link" href="#" onclick="return false">Explore the writing tools</a>
+            <button class="sheet-close" id="close" type="button">Close</button>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes-list">
+    <h2>What changed from today’s demo</h2>
+    <ul>
+      <li><b>The conversation comes first.</b> It starts at the top of the screen, and Sky’s opening message is fully visible.</li>
+      <li><b>Nothing else competes.</b> No tab bar, focus chip, help link, disclaimer paragraph or Sign out.</li>
+      <li><b>One tap to start talking.</b> The starters answer Sky’s question for you.</li>
+      <li><b>“What Sky knows” sits beside the chat</b> on a computer, and becomes a pill and a sheet on a phone. New notes light up as Sky saves them.</li>
+      <li><b>Keep appears once,</b> with the price and the 24-hour clock next to it. The top bar only says the demo clears in 24 hours.</li>
+    </ul>
+    <p class="small">Message count only appears in the bar once there are 3 or fewer left. Tools stay reachable from the small link and from Sky’s own suggestions.</p>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s)
+const stage = $('#stage'), msgs = $('#msgs'), notesEl = $('#notes'), know = $('#know')
+const script = [
+  { text: 'Thanks for telling me. What are you doing at the moment, and what’s making you think about moving?', note: 'Is thinking about a change from their current work.' },
+  { text: 'That sounds draining. If the next job could give you more of one thing, would it be the pay, the hours or the work itself?', note: 'Current job is wearing them down.' },
+  { text: 'That helps, thank you. Here is what I’ve got so far: you want out of a job that is wearing you down, and what matters most is the hours. Shall we look at what roles could give you that?', note: 'Hours matter more to them than pay.' }
+]
+let turn = 0, busy = false, notes = 0
+const plural = n => n === 1 ? '1 thing' : n + ' things'
+
+function addMsg(role, text, cls = '') { const d = document.createElement('div'); d.className = 'msg ' + role + ' ' + cls; d.textContent = text; msgs.append(d); msgs.scrollTop = msgs.scrollHeight; return d }
+function addNote(text) {
+  const ph = notesEl.querySelector('.ph'); if (ph) ph.remove()
+  const li = document.createElement('li'); li.className = 'new'; li.textContent = text; notesEl.append(li)
+  notes++; $('#count').textContent = plural(notes); $('#empty').style.display = 'none'
+  $('#pillcount').textContent = 'Sky knows ' + plural(notes)
+}
+function send(text) {
+  text = text.trim(); if (!text || busy) return
+  $('#starters')?.remove(); addMsg('user', text); $('#box').value = ''
+  busy = true; const t = addMsg('assistant', '···', 'typing')
+  setTimeout(() => {
+    t.remove()
+    const r = script[Math.min(turn, script.length - 1)]
+    addMsg('assistant', turn < script.length ? r.text : 'Tell me more about that.')
+    if (turn < script.length) addNote(r.note)
+    turn++; busy = false
+  }, 1000)
+}
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => send(c.textContent)))
+$('#form').addEventListener('submit', e => { e.preventDefault(); send($('#box').value) })
+$('#box').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#box').value) } })
+$('#keepbtn').addEventListener('click', () => { $('#keepform').classList.add('on'); $('#keepbtn').style.display = 'none' })
+$('#pill').addEventListener('click', () => know.classList.add('open'))
+$('#close').addEventListener('click', () => know.classList.remove('open'))
+
+function view(v) { stage.className = 'stage ' + v; $('#v-desktop').classList.toggle('on', v === 'desktop'); $('#v-phone').classList.toggle('on', v === 'phone'); know.classList.remove('open'); history.replaceState(null, '', '#' + v) }
+$('#v-desktop').onclick = () => view('desktop'); $('#v-phone').onclick = () => view('phone')
+$('#replay').onclick = () => location.reload()
+if (location.hash === '#phone') view('phone')
+</script>
+</body>
+</html>
