@@ -435,9 +435,54 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
   .composer textarea { min-height: 44px; max-height: 88px; }
 }
 
-/* ── The demo: what Sky knows, and keeping it ── */
-.demo-mem { gap: 8px; }
-.demo-notes { margin: 0; padding-left: 18px; max-height: 190px; overflow-y: auto; }
-.demo-notes li { margin: 3px 0; }
+/* ── The demo screen: the conversation first, what Sky knows beside it ── */
 .keep-form { display: flex; flex-direction: column; gap: 10px; }
 .toolcard.held { opacity: .7; border-style: dashed; }
+
+body.demo-mode #foot { display: none; }
+body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 900px) { body.demo-mode .paper.app { padding-left: 0; padding-bottom: 12px; } }
+.demo-back { margin: 4px 0 10px; }
+.demo-screen { gap: 0; }
+.demo-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.demo-chat { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: calc(100dvh - 180px); }
+.demo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.demo-head h2 { margin: 0; font-family: var(--display); font-size: 28px; }
+.demo-head .hand { font: 600 21px var(--hand); color: var(--note); }
+.demo-chat .msgs { min-height: 0; flex: 1 1 auto; }
+.demo-dock { position: sticky; bottom: 0; z-index: 5; background: #fff; padding-top: 6px; }
+.demo-dock .composer { position: static; border-top: 0; box-shadow: none; padding: 6px 0 0; }
+.fine { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+
+.demo-know { background: #fff; border: 1.5px solid var(--rule); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dk-title { margin: 0; font: 700 12px var(--body); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.dk-title em { font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.dk-notes { list-style: none; margin: 0; padding: 0; min-height: 96px; }
+.dk-notes li { margin: 0 0 10px; padding: 7px 10px; border-radius: 10px; font-size: 15px; line-height: 1.4; border-left: 4px solid var(--hl); background: var(--paper-2); overflow-wrap: anywhere; }
+.dk-notes li.new { animation: dk-flash 1.8s ease-out; }
+.dk-notes li.ph { height: 14px; padding: 0; border: 0; background: linear-gradient(90deg, var(--rule-line), #F7F9FC); width: 86%; margin: 14px 0; }
+.dk-notes li.ph:nth-child(2) { width: 68%; } .dk-notes li.ph:nth-child(3) { width: 76%; }
+@keyframes dk-flash { 0% { background: var(--hl); transform: translateX(-6px); opacity: .2; } 25% { opacity: 1; transform: none; } 100% { background: var(--paper-2); } }
+@media (prefers-reduced-motion: reduce) { .dk-notes li.new { animation: none; } }
+.dk-empty { margin: 0; font-size: 14px; color: var(--muted); }
+.dk-keep { border-top: 1.5px solid var(--rule); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.dk-keep .btn { width: 100%; }
+.dk-keep p { margin: 0; }
+.dk-tools { align-self: flex-start; font-size: 14px; }
+.demo-pill, .sheet-close, .demo-scrim { display: none; }
+
+/* Computer: the panel sits beside the chat and stays in view while it scrolls. */
+@media (min-width: 900px) {
+  .demo-grid { grid-template-columns: minmax(0, 1fr) 340px; gap: 26px; align-items: start; }
+  .demo-know { position: sticky; top: 64px; }
+}
+
+/* Phone and tablet: a pill above the message box opens the panel as a sheet. */
+@media (max-width: 899px) {
+  .demo-pill { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin: 0 0 4px; padding: 9px 14px; border: 1.5px solid var(--ink); border-radius: 99px; background: #fff; font-weight: 600; font-size: 14px; min-height: 44px; }
+  .demo-pill .dk-dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; background: var(--hl); border: 1.5px solid var(--ink); }
+  .demo-know { position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; max-height: 86dvh; overflow-y: auto; border: 0; border-top: 2px solid var(--ink); border-radius: 22px 22px 0 0; box-shadow: 0 -12px 30px rgba(21, 32, 59, .22); padding: 18px 18px calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateY(110%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s; }
+  .demo-know.open { transform: none; visibility: visible; transition: transform .25s ease; }
+  .sheet-close { display: block; align-self: center; color: var(--muted); font-size: 14px; }
+  .demo-scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(21, 32, 59, .35); }
+}

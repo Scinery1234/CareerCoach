@@ -41,7 +41,7 @@ http.createServer(async (req, res) => {
   const api = Object.keys(handlers).find(k => req.url.split('?')[0] === k)
   if (api) {
     let body = ''; for await (const c of req) body += c
-    const r = { code: 200, status(c) { r.code = c; return r }, json(b) { res.writeHead(r.code, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); return r }, end() { res.writeHead(r.code); res.end(); return r } }
+    const r = { code: 200, status(c) { r.code = c; return r }, setHeader() { return r }, json(b) { res.writeHead(r.code, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); return r }, end() { res.writeHead(r.code); res.end(); return r } }
     try { await handlers[api]({ method: req.method, headers: req.headers, body: JSON.parse(body || '{}') }, r) } catch (e) { console.error('HANDLER THREW', e); res.writeHead(500); res.end(JSON.stringify({ error: e.message })) }
     return
   }

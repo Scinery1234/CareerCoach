@@ -12,7 +12,10 @@ async function api(body) {
 
 async function init() {
   try { if (localStorage.getItem(KEY)) $('resume-note').hidden = false } catch {}
-  try { const info = await api({ action: 'info' }); needsCode = !!info.needsCode; $('code-field').hidden = !needsCode } catch {}
+  try {
+    const info = await api({ action: 'info' }); needsCode = !!info.needsCode; $('code-field').hidden = !needsCode
+    if (info.available === false) { const err = $('d-error'); err.textContent = 'The demo is being set up and Sky isn’t switched on yet. Please check back soon.'; err.hidden = false; $('d-start').disabled = true }
+  } catch {}
   const code = new URL(location.href).searchParams.get('code')
   if (code) $('d-code').value = code
 }

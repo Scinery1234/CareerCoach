@@ -51,9 +51,12 @@ export default async function handler(req, res) {
   const { data: activeCodes } = await supabase.from('newpage_demo_codes').select('code, uses, max_uses').eq('active', true)
   const needsCode = (activeCodes || []).length > 0
 
-  if (b.action === 'info') return res.json({ needsCode, caps: DEMO.caps, hours: DEMO.hours })
+  // A demo with a dead chat is worse than no demo: say so up front, and don't make a member.
+  const available = !!process.env.ANTHROPIC_API_KEY
+  if (b.action === 'info') return res.json({ needsCode, available, caps: DEMO.caps, hours: DEMO.hours })
 
   if (b.action === 'start') {
+    if (!available) return res.status(503).json({ error: 'The demo is being set up and Sky isn’t switched on yet. Please check back soon.', code: 'unavailable' })
     if (!rateLimit(req, res, { max: 5, windowMs: 60 * 60 * 1000, key: 'np-demo-start' })) return
     let code = null
     if (needsCode) {

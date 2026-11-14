@@ -413,6 +413,7 @@ function coachScreen() {
     S.coachSending = false
     render(); scrollChat()
   }
+  if (me.member.demo) return demoCoach(me, send)
   return h('section', { class: 'screen chat' },
     h('div', { class: 'sky-head' },
       h('div', {}, h('span', { class: 'note' }, 'your AI Coach'), h('h2', {}, 'Sky')),
@@ -420,7 +421,6 @@ function coachScreen() {
         h('button', { class: 'chip focus-btn', type: 'button', 'aria-haspopup': 'dialog', onclick: () => openSky(ctx) }, focusIcon(info.id, 26), h('span', { class: 'muted' }, 'Focus: '), h('b', {}, info.name), ' ▾'),
         h('button', { class: 'link-btn blue', type: 'button', onclick: () => openSky(ctx) }, 'What can Sky help with?'))),
     h('p', { class: 'small muted' }, `${info.blurb} Sky is an AI. It’s coaching, not therapy, and it can’t replace a human coach.`),
-    me.member.demo && demoMemory(me),
     me.member.memoryRestored && !S.restoredSeen && h('p', { class: 'soft', role: 'status' }, 'Welcome back. Sky remembers you, and your chats and notes are exactly as you left them.'),
     !me.member.privacy && h('div', { class: 'tool-callout' },
       h('div', {}, h('b', {}, 'Set up Sky (2 minutes)'), h('p', { class: 'small' }, 'Choose what a human coach could see, and tell Sky about you: your resume, your Myers-Briggs type and more. Sky keeps notes as you chat, so you never repeat yourself.')),
@@ -599,9 +599,10 @@ function go(tab, sub) {
 
 function renderTabs() {
   const show = S.me && !['login', 'sent', 'loading', 'noaccess'].includes(S.screen)
-  tabbar.hidden = !show
-  signoutBtn.hidden = !show
-  if (!show) return
+  const chrome = show && !S.me.member.demo      // a demo visitor gets no tab bar and no Sign out
+  tabbar.hidden = !chrome
+  signoutBtn.hidden = !chrome
+  if (!chrome) return
   tabbar.replaceChildren(h('div', { class: 'tabbar-in' }, TABS.filter(([k]) => !(k === 'plan' && S.me.member.plan === 'tools')).map(([k, label]) => {
     const needsCheckin = k === 'me' && !S.me.plan
     const btn = h('button', { class: 'tab', type: 'button', 'aria-current': S.tab === k ? 'page' : null, onclick: () => { go(k); if (k === 'coach' && !skySeen()) setTimeout(() => openSky(ctx), 250) } }, label, needsCheckin && h('span', { class: 'dotbadge', 'aria-label': 'Check-in needed' }))
@@ -623,20 +624,32 @@ function render() {
   else if (S.screen === 'noaccess') node = noAccessScreen()
   else if (S.lessonId) node = lessonScreen()
   else node = ({ today: todayScreen, plan: planScreen, coach: coachScreen, tools: toolsScreen, me: meScreen }[S.tab] || todayScreen)()
+  // A demo visitor has no tab bar: one screen, Sky, and a way back to it from anywhere else.
+  const demo = S.screen === 'app' && !!S.me?.member?.demo
+  document.body.classList.toggle('demo-mode', demo)
+  if (demo && (S.tab !== 'coach' || S.lessonId)) node = h('div', {}, h('button', { class: 'link-btn blue demo-back', type: 'button', onclick: () => { S.lessonId = null; S.tool = null; go('coach') } }, '← Back to Sky'), node)
   app.replaceChildren(node)
   renderDemoBar()
-  document.querySelector('.paper')?.classList.toggle('wide', S.screen === 'app' && ((S.tab === 'tools' && !!S.tool) || S.tab === 'today' || S.tab === 'plan'))
+  document.querySelector('.paper')?.classList.toggle('wide', S.screen === 'app' && ((S.tab === 'tools' && !!S.tool) || S.tab === 'today' || S.tab === 'plan' || (demo && S.tab === 'coach')))
   renderTabs()
   if (active) { const el = document.getElementById(active); if (el) { el.focus(); if (sel != null && el.setSelectionRange) try { el.setSelectionRange(sel, sel) } catch {} } }
 }
 
-// ── The demo: what Sky knows so far, and the way to keep it ──────────
-// The notes Sky saves while it talks, shown as they appear. Keeping them means joining: the same
-// member carries on, so Sky's memory of them comes along (see applyCheckout).
+// ── The demo screen ─────────────────────────────────────────────────
+// The conversation comes first. Beside it (a sheet on a phone) is what Sky has learned so far, and
+// the one way to keep it: the same member carries on if they join (see applyCheckout), so Sky's
+// memory of them comes along. Nothing else competes: no tabs, focus chip, help link or Sign out.
+const DEMO_STARTERS = ['I’m looking for work', 'I want a change', 'I’m not sure what’s next', 'I’m stuck']
 const hoursLeft = d => Math.max(0, Math.round((new Date(d.until) - Date.now()) / 3600e3))
-function openKeep() { S.keepOpen = true; S.keepErr = ''; if (S.tab !== 'coach' || S.tool) go('coach'); else render() }
-function demoMemory(me) {
+const clearsIn = d => { const h = hoursLeft(d); return h < 1 ? 'in under an hour' : `in ${h} hour${h === 1 ? '' : 's'}` }
+const countText = n => (n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing yet')
+
+function demoPanel(me) {
   const d = me.member.demo, notes = me.memory || []
+  // Notes already on screen are quiet; one that arrives while they watch lights up once.
+  S.seenNotes ||= new Set(notes.map(n => n.id))
+  const fresh = new Set(notes.filter(n => !S.seenNotes.has(n.id)).map(n => n.id))
+  notes.forEach(n => S.seenNotes.add(n.id))
   const keep = async e => {
     e.preventDefault()
     if (S.keepBusy) return
@@ -648,19 +661,49 @@ function demoMemory(me) {
     } catch (err) { S.keepErr = err.message }
     S.keepBusy = false; render()
   }
-  return h('div', { class: 'card demo-mem', id: 'demo-memory' },
-    h('div', { class: 'row review-head' }, h('span', { class: 'label' }, 'What Sky knows about you'), h('span', { class: 'small muted' }, notes.length ? `${notes.length} thing${notes.length === 1 ? '' : 's'}` : 'nothing yet')),
-    notes.length ? h('ul', { class: 'demo-notes' }, notes.map(n => h('li', {}, n.note)))
-      : h('p', { class: 'small muted' }, 'Talk to Sky and it will start to remember. Whatever it learns shows up here.'),
-    h('p', { class: 'small' }, `This clears itself in about ${hoursLeft(d)} hour${hoursLeft(d) === 1 ? '' : 's'}. Join to keep it, and Sky picks up exactly where you left off.`),
-    !S.keepOpen
-      ? h('button', { class: 'btn btn-primary', type: 'button', onclick: openKeep }, 'Keep what Sky knows')
-      : h('form', { class: 'keep-form', onsubmit: keep },
-        h('div', { class: 'field' }, h('label', { for: 'keep-name' }, 'Your name'), h('input', { id: 'keep-name', type: 'text', autocomplete: 'name', maxlength: '80', required: true, value: S.keepName || '', oninput: e => { S.keepName = e.target.value } })),
-        h('div', { class: 'field' }, h('label', { for: 'keep-email' }, 'Your email'), h('input', { id: 'keep-email', type: 'email', autocomplete: 'email', maxlength: '200', required: true, value: S.keepEmail || '', oninput: e => { S.keepEmail = e.target.value } })),
-        h('p', { class: 'small muted' }, 'Free for 7 days, then $25 a month. Cancel in two taps. You’ll enter your card on Stripe. By continuing you agree to our ', h('a', { href: '/terms', target: '_blank', rel: 'noopener' }, 'Terms'), ' and ', h('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.'),
-        S.keepErr && h('p', { class: 'error', role: 'alert' }, S.keepErr),
-        h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit', disabled: S.keepBusy }, S.keepBusy ? 'Taking you to Stripe…' : 'Keep it'), h('button', { class: 'link-btn', type: 'button', onclick: () => { S.keepOpen = false; render() } }, 'Not now'))))
+  return h('aside', { class: 'demo-know' + (S.sheetOpen ? ' open' : ''), id: 'demo-memory', 'aria-label': 'What Sky knows about you' },
+    h('h3', { class: 'dk-title' }, h('span', {}, 'What Sky knows about you'), h('em', {}, countText(notes.length))),
+    h('ul', { class: 'dk-notes' },
+      notes.map(n => h('li', { class: fresh.has(n.id) ? 'new' : '' }, n.note)),
+      ...(notes.length ? [] : [0, 1, 2].map(() => h('li', { class: 'ph', 'aria-hidden': 'true' })))),
+    !notes.length && h('p', { class: 'dk-empty' }, 'What Sky learns will appear here as you talk.'),
+    h('div', { class: 'dk-keep' },
+      !S.keepOpen
+        ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { S.keepOpen = true; S.keepErr = ''; render(); document.getElementById('keep-name')?.focus() } }, 'Keep what Sky knows')
+        : h('form', { class: 'keep-form', onsubmit: keep },
+          h('div', { class: 'field' }, h('label', { for: 'keep-name' }, 'Your name'), h('input', { id: 'keep-name', type: 'text', autocomplete: 'name', maxlength: '80', required: true, value: S.keepName || '', oninput: e => { S.keepName = e.target.value } })),
+          h('div', { class: 'field' }, h('label', { for: 'keep-email' }, 'Your email'), h('input', { id: 'keep-email', type: 'email', autocomplete: 'email', maxlength: '200', required: true, value: S.keepEmail || '', oninput: e => { S.keepEmail = e.target.value } })),
+          S.keepErr && h('p', { class: 'error', role: 'alert' }, S.keepErr),
+          h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit', disabled: S.keepBusy }, S.keepBusy ? 'Taking you to Stripe…' : 'Keep it'), h('button', { class: 'link-btn', type: 'button', onclick: () => { S.keepOpen = false; render() } }, 'Not now'))),
+      h('p', { class: 'small muted' }, `This clears itself ${clearsIn(d)}. Join to keep it, and Sky picks up where you left off. Free for 7 days, then $25 a month, cancel in two taps. By joining you agree to our `, h('a', { href: '/terms', target: '_blank', rel: 'noopener' }, 'Terms'), ' and ', h('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.')),
+    h('button', { class: 'link-btn blue dk-tools', type: 'button', onclick: () => { S.sheetOpen = false; go('tools') } }, 'Explore the writing tools'),
+    h('button', { class: 'link-btn sheet-close', type: 'button', onclick: () => { S.sheetOpen = false; render() } }, 'Close'))
+}
+
+function demoCoach(me, send) {
+  const d = me.member.demo, notes = me.memory || []
+  const firstTurn = !me.messages.some(m => m.role === 'user')
+  return h('section', { class: 'screen chat demo-screen' },
+    h('div', { class: 'demo-grid' },
+      h('div', { class: 'demo-chat' },
+        h('div', { class: 'demo-head' }, h('h2', {}, 'Sky'), h('span', { class: 'hand' }, 'your AI career coach')),
+        !me.coachOn && h('p', { class: 'soft' }, 'Sky isn’t available right now. Please try the demo again a little later.'),
+        S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'),
+          h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),
+        h('div', { class: 'msgs', id: 'msgs' },
+          me.messages.map(m => h('div', { class: `msg ${m.role}` }, m.role === 'assistant' ? inline(m.content) : m.content)),
+          S.coachSending && h('div', { class: 'msg assistant typing', 'aria-label': 'Sky is typing' }, '···'),
+          firstTurn && !S.coachSending && h('div', { class: 'starters' }, DEMO_STARTERS.map(t => h('button', { class: 'chip', type: 'button', onclick: () => send(t) }, t)))),
+        S.coachError && h('p', { class: 'error', role: 'alert' }, S.coachError),
+        h('div', { class: 'demo-dock' },
+          h('button', { class: 'demo-pill', type: 'button', 'aria-haspopup': 'dialog', onclick: () => { S.sheetOpen = true; render() } },
+            h('span', {}, h('i', { class: 'dk-dot', 'aria-hidden': 'true' }), notes.length ? `Sky knows ${countText(notes.length)}` : 'Sky knows nothing yet'), h('span', { 'aria-hidden': 'true' }, '▴')),
+          h('form', { class: 'composer', onsubmit: e => { e.preventDefault(); send(S.coachDraft) } },
+            h('textarea', { id: 'coach-box', rows: '1', maxlength: '2000', placeholder: 'Type your answer…', 'aria-label': 'Message Sky', disabled: !me.coachOn, oninput: e => { S.coachDraft = e.target.value }, onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(S.coachDraft) } } }, S.coachDraft),
+            h('button', { id: 'coach-send', class: 'btn btn-primary', type: 'submit', disabled: S.coachSending || !me.coachOn || !S.coachDraft.trim() }, 'Send')),
+          h('p', { class: 'fine' }, 'Sky is an AI. It’s coaching, not therapy. In crisis? Call your local emergency number, or find a helpline at ', h('a', { href: 'https://findahelpline.com' }, 'findahelpline.com'), '.'))),
+      demoPanel(me)),
+    S.sheetOpen && h('div', { class: 'demo-scrim', onclick: () => { S.sheetOpen = false; render() } }))
 }
 
 // ── Demo bar: shows only for demo visitors ──────────────────────────
@@ -670,12 +713,11 @@ function renderDemoBar() {
   const d = S.me?.member?.demo
   if (!d || S.screen !== 'app') { demoBar?.remove(); demoBar = null; document.body.classList.remove('has-demobar'); return }
   if (!demoBar) { demoBar = h('div', { class: 'demobar', role: 'region', 'aria-label': 'Demo' }); document.body.prepend(demoBar); document.body.classList.add('has-demobar') }
-  const left = hoursLeft(d)
+  const left = Math.max(0, d.caps.messages - d.messagesUsed)
   demoBar.replaceChildren(
-    h('span', {}, h('b', {}, 'Demo'), ` · clears in ${left}h unless you keep it · Sky: ${Math.max(0, d.caps.messages - d.messagesUsed)} of ${d.caps.messages} messages left`),
+    h('span', {}, h('b', {}, 'Demo'), ` · clears ${clearsIn(d)}`, left <= 3 ? ` · ${left} message${left === 1 ? '' : 's'} left with Sky` : ''),
     h('span', { class: 'demobar-actions' },
-      h('button', { class: 'demobar-btn', type: 'button', onclick: () => { S.feedbackOpen = !S.feedbackOpen; S.feedbackSent = false; render() } }, 'Give feedback'),
-      h('button', { class: 'demobar-btn solid', type: 'button', onclick: openKeep }, 'Keep what Sky knows')))
+      h('button', { class: 'demobar-btn', type: 'button', onclick: () => { S.feedbackOpen = !S.feedbackOpen; S.feedbackSent = false; render() } }, 'Give feedback')))
   if (S.feedbackOpen) demoBar.append(feedbackForm())
 }
 function feedbackForm() {

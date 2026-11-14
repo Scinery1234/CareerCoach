@@ -209,3 +209,20 @@ test('a converted member is never swept, and an unconverted demo past its time i
   assert.ok(db.rows('newpage_members').some(m => m.id === keep.id), 'the paid member stays')
   assert.ok(!db.rows('newpage_members').some(m => m.id === stale.id), 'the expired demo goes')
 })
+
+test('the demo does not start while Sky is switched off, and says so instead of opening a dead chat', async () => {
+  const key = process.env.ANTHROPIC_API_KEY
+  delete process.env.ANTHROPIC_API_KEY
+  const before = db.rows('newpage_members').length
+  try {
+    const info = res(); await demoApi({ method: 'POST', headers: { 'x-forwarded-for': '10.9.0.1' }, body: { action: 'info' } }, info)
+    assert.equal(info.body.available, false)
+    const r = res(); await demoApi({ method: 'POST', headers: { 'x-forwarded-for': '10.9.0.2' }, body: { action: 'start', code: '', website: '' } }, r)
+    assert.equal(r.code, 503)
+    assert.equal(r.body.code, 'unavailable')
+    assert.match(r.body.error, /Sky isn’t switched on yet/)
+    assert.equal(db.rows('newpage_members').length, before, 'no member was created')
+  } finally { process.env.ANTHROPIC_API_KEY = key }
+  const ok = res(); await demoApi({ method: 'POST', headers: { 'x-forwarded-for': '10.9.0.3' }, body: { action: 'info' } }, ok)
+  assert.equal(ok.body.available, true)
+})
