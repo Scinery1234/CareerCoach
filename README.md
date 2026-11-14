@@ -8,7 +8,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 
 | Path | What it does |
 |---|---|
-| `index.html` | The landing page the ads point at. `/join` pays, `/demo` is the no-sign-up demo. |
+| `index.html` | The home page, which the ads also point at. `/join` pays, `/demo` is the no-sign-up demo. |
 | `app/` | The member app: Today, Coach (Sky), Tools, Me. Plain HTML, CSS and JS, no build step. |
 | `join/`, `demo/`, `memory/`, `admin/` | Paying, the demo, the memory page linked from retention emails, and the admin (members, demo feedback, the content editor, "Is everything working?"). `admin/bookings.html` manages the human coach's availability and bookings. |
 | `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`, `applycheck` (Sunday note about the week's applications, for members who turned it on), `alerts` (hourly: new listings from Adzuna scored for fit, see below). |
@@ -50,7 +50,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 
 ## The landing page and ads
 
-`index.html` is the page ads land on. It carries one message, one button and the product drawn in HTML, with proof next to the button and the objections answered under it. Each ad angle has its own headline: send traffic to `/?v=resume` (default), `/?v=direction`, `/?v=stuck` or `/?v=interview`, so the ad's promise and the headline match. The variant travels to the thank-you page and is sent with the conversion event.
+`index.html` is the home page, and the page ads land on. It positions the product as the whole job search in one membership, against stitching single-purpose tools together, then shows each of the six tools (the Compass, resume and cover letter writers, the Apply extension, interview coaching, Sky, psychological coaching) with the product drawn in HTML, then how they hand on to each other, the price and the objections. The Apply extension carries a "Coming to the Chrome Web Store" tag (`.soon`); remove it once the extension is published. The default headline is the whole-job-search one. Each ad angle has its own headline: send traffic to `/?v=resume`, `/?v=direction`, `/?v=stuck` or `/?v=interview`, so the ad's promise and the headline match. The variant travels to the thank-you page and is sent with the conversion event.
 
 The demo (`/demo`) is the product in miniature. The visitor gets an empty 24-hour member and Sky opens the conversation: it asks who they are and what is on their mind, follows what they say, and saves notes as it goes, which the visitor watches appear under "What Sky knows about you". "Keep what Sky knows" takes a name and email to Stripe; the paid checkout turns that same member into the paid one (`demo_member` in the Stripe metadata, `applyCheckout`), so Sky's memory of them carries over. While they pay, the demo is kept alive for up to three hours, and never past 36 hours from when it started. A demo that is not kept is deleted after 24 hours by the sweep. Limits are in `lib/newpage-demo-config.js`.
 
