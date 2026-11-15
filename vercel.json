@@ -1,6 +1,31 @@
 {
   "framework": null,
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?dowithlife\\.com"
+        }
+      ],
+      "destination": "/compass"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:section(join|demo|app|admin|memory)/:rest*",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?dowithlife\\.com"
+        }
+      ],
+      "destination": "https://aicareercoach.net/:section/:rest*",
+      "permanent": false
+    }
+  ],
   "crons": [
     {
       "path": "/api/emails/reminder",
