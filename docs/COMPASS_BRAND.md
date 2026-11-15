@@ -13,7 +13,7 @@ The brand for the Compass landing page at `/compass`. It is deliberately unlike 
 | **Compass** | The brand and the product. The wordmark is lowercase: **compass**. In sentences, "the Compass". |
 | **by Do With Life** | The endorsement, small caps beside the wordmark. The headline plays on it: "Work out what to *do with life.*" |
 | **Your bearing** | The two-minute quiz and its result. Never "test", "assessment" or "type". |
-| Recharge, Explore, Unstick, Launch | The four places a bearing can land. Shown only after the quiz. Always "you're in Explore", a place right now, never a label. |
+| Recharge, Explore, Unstick, Launch | The four places a bearing can land. Shown only after the quiz. Always "your bearing is Explore", where you are right now, never a label ("you are an Explorer"). |
 
 ## Colour
 

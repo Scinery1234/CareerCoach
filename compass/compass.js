@@ -139,8 +139,8 @@ function renderResult(answers, r = score(answers)) {
 
   $('result').replaceChildren(...[
     r.struggling && support,
-    h('p', { className: 'eyebrow' }, 'Your bearing, right now'),
-    h('h2', { tabIndex: -1, id: 'r-head' }, 'You’re in ', h('em', {}, Q.name), '.'),
+    h('p', { className: 'eyebrow' }, 'Where you are right now'),
+    h('h2', { tabIndex: -1, id: 'r-head' }, 'Your bearing is ', h('em', {}, Q.name), '.'),
     h('p', { className: 'tag' }, Q.tag),
     h('p', { className: 'lead' }, Q.meaning),
     !r.struggling && support,
@@ -157,7 +157,7 @@ function renderResult(answers, r = score(answers)) {
         cta('/join', 'btn btn-north', 'cta', 'Start the Compass, free for 7 days', 'Start the Compass for $25 a month'),
         cta('/demo', 'btn btn-ghost', 'demo', 'Talk to Sky first, no sign-up')),
       h('p', { className: 'fine t7' }, 'Nothing charged for 7 days, then $25 a month. Cancel in two taps.')),
-    h('p', { className: 'fine' }, 'This is a place you’re in right now, not a label. It moves, so come back in a few weeks.'),
+    h('p', { className: 'fine' }, 'This is where you are right now, not a label. It moves, so come back in a few weeks.'),
     h('button', { type: 'button', className: 'linkbtn', onclick: () => { store(null); startQuiz() } }, 'Take it again')
   ].filter(Boolean))
 
