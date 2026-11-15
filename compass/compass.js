@@ -122,6 +122,8 @@ function finish() {
 }
 
 // ── The result ───────────────────────────────────────────────────
+// The quarter names are verbs, so the headline uses them as verbs: "It's time to explore."
+const DO = { recharge: 'recharge', explore: 'explore', unstick: 'get unstuck', launch: 'launch' }
 function renderResult(answers, r = score(answers)) {
   const Q = QUADRANTS[r.quadrant]
   document.documentElement.style.setProperty('--q', Q.color)
@@ -139,8 +141,8 @@ function renderResult(answers, r = score(answers)) {
 
   $('result').replaceChildren(...[
     r.struggling && support,
-    h('p', { className: 'eyebrow' }, 'Where you are right now'),
-    h('h2', { tabIndex: -1, id: 'r-head' }, 'Your bearing is ', h('em', {}, Q.name), '.'),
+    h('p', { className: 'eyebrow' }, 'Your bearing, right now'),
+    h('h2', { tabIndex: -1, id: 'r-head' }, 'It’s time to ', h('em', {}, DO[r.quadrant]), '.'),
     h('p', { className: 'tag' }, Q.tag),
     h('p', { className: 'lead' }, Q.meaning),
     !r.struggling && support,
@@ -151,7 +153,7 @@ function renderResult(answers, r = score(answers)) {
     h('div', { className: 'panel sell' },
       h('h3', {}, 'Where the Compass comes in'),
       h('p', {}, compassWeek
-        ? `From ${Q.name}, the Compass belongs in week ${compassWeek}: ten short steps from your values to a direction and three first steps. You can start it tonight, and it remembers where you’re at.`
+        ? `On this plan, the Compass comes in week ${compassWeek}: ten short steps from your values to a direction and three first steps. You can start it tonight, and it remembers where you’re at.`
         : 'The Compass is ten short steps from your values to a direction and three first steps.'),
       h('div', { className: 'cta-row' },
         cta('/join', 'btn btn-north', 'cta', 'Start the Compass, free for 7 days', 'Start the Compass for $25 a month'),
