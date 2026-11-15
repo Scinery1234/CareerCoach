@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Compass by Do With Life · find your bearing in two minutes</title>
+<meta name="description" content="Not sure what to do next with your working life? Answer ten questions and see where you are right now, with a first step for this week. No sign-up. Then the Compass takes you from your values to a direction and three first steps.">
+<meta property="og:title" content="Work out what to do with life. Start with a two-minute bearing.">
+<meta property="og:description" content="Ten questions about your clarity and your energy. No sign-up, no email. You get where you are right now and one step for this week.">
+<meta name="theme-color" content="#0B1020">
+<link rel="icon" href="/compass/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/compass/compass.css">
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="brand" href="/compass" aria-label="Compass by Do With Life">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 4.5l3.4 11.5L16 27.5 12.6 16z" fill="currentColor" opacity=".28"/><path d="M16 4.5L19.4 16h-6.8z" fill="#FF7A45"/></svg>
+    <span class="word">compass</span><span class="by">by Do With Life</span>
+  </a>
+  <nav class="top-right">
+    <a href="#how">How it works</a>
+    <a href="#price" class="sell">Price</a>
+    <a href="/app">Sign in</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero" id="top">
+    <div class="stage">
+      <!-- Before the quiz -->
+      <div class="view" id="intro">
+        <p class="eyebrow"><b>2 minutes</b> · ten questions · no sign-up</p>
+        <h1>Work out what to <em>do with life.</em></h1>
+        <p class="lead">Start with a bearing. Ten quick questions about your clarity and your energy show where you are right now, and give you one step for this week. No email, nothing to install.</p>
+        <div class="cta-row">
+          <button class="btn btn-north" id="start" type="button">Find my bearing</button>
+          <button class="btn btn-ghost" id="resume" type="button" hidden>See my last result</button>
+        </div>
+        <p class="fine">Then, if you want to go further, the Compass takes you from your values to a direction and three first steps.</p>
+      </div>
+
+      <!-- The quiz: one question at a time -->
+      <div class="view" id="quiz" hidden>
+        <div class="q-top">
+          <button class="back" id="back" type="button" aria-label="Previous question">← Back</button>
+          <span class="count" id="count"></span>
+        </div>
+        <div class="bar"><i id="bar"></i></div>
+        <p class="eyebrow" id="q-section"></p>
+        <p class="q-prompt" id="q-prompt"></p>
+        <h2 class="q-text" id="q-text" tabindex="-1"></h2>
+        <div class="opts" id="opts" role="group" aria-labelledby="q-text"></div>
+        <p class="fine keys">Tip: the number keys pick an answer.</p>
+      </div>
+
+      <!-- The result -->
+      <div class="view" id="result" hidden></div>
+    </div>
+
+    <div class="dial-wrap">
+      <svg class="dial seeking" id="dial" viewBox="-100 -100 200 200" role="img" aria-label="A compass. The needle settles as you answer.">
+        <circle class="ring" r="92"/>
+        <circle class="ring thin" r="80"/>
+        <g id="wedges">
+          <path data-q="launch" d="M0,0 L0,-80 A80,80 0 0 1 80,0 Z"/>
+          <path data-q="explore" d="M0,0 L80,0 A80,80 0 0 1 0,80 Z"/>
+          <path data-q="recharge" d="M0,0 L0,80 A80,80 0 0 1 -80,0 Z"/>
+          <path data-q="unstick" d="M0,0 L-80,0 A80,80 0 0 1 0,-80 Z"/>
+        </g>
+        <g id="ticks"></g>
+        <path class="axis" d="M0,-80V80M-80,0H80"/>
+        <g id="names" aria-hidden="true">
+          <text data-q="launch" x="70" y="-80">Launch</text>
+          <text data-q="explore" x="70" y="87">Explore</text>
+          <text data-q="recharge" x="-70" y="87">Recharge</text>
+          <text data-q="unstick" x="-70" y="-80">Unstick</text>
+        </g>
+        <g id="needle"><path class="n" d="M0,-66 L7,0 L-7,0 Z"/><path class="s" d="M0,30 L7,0 L-7,0 Z"/></g>
+        <circle class="hub" r="4.5"/>
+        <g id="dot" hidden><circle class="halo" r="11"/><circle class="pt" r="5.5"/></g>
+      </svg>
+      <p class="dial-cap" id="dial-cap">The needle settles as you answer.</p>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <p class="label">After your bearing</p>
+    <h2>The Compass: ten short steps from “no idea” to <em>a direction.</em></h2>
+    <p class="sub">A personality test hands you a type and a list of jobs. The Compass works the other way: it starts with what matters to you, builds ideas from your own words, and ends with a choice, a plan and first steps in your calendar.</p>
+    <ol class="trail" id="trail" tabindex="0" aria-label="The ten steps of the Compass"></ol>
+    <p class="fine">Swipe to see all ten. Do them in one sitting or over a fortnight; it saves as you go.</p>
+  </section>
+
+  <section class="band try">
+    <div class="try-copy">
+      <p class="label">Try step one</p>
+      <h2>Pick the five values that matter <em>most</em> to you.</h2>
+      <p class="sub">Go on instinct. There are no right answers, and nobody is scoring this.</p>
+      <p class="tally" id="tally" aria-live="polite">0 of 5 chosen</p>
+    </div>
+    <div>
+      <div class="chips" id="chips"></div>
+      <div class="try-done" id="try-done" hidden>
+        <p><b>That’s how step one starts.</b> Inside, you choose from 45 values and put your five in order. Then the Compass asks who you are when you’re living them.</p>
+        <a class="btn btn-north sell" href="/join" data-track="cta" data-place="compass-values"><span class="t7">Keep going, free for 7 days</span><span class="t0">Keep going in the Compass</span></a>
+        <p class="fine">These picks aren’t saved from this page.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <p class="label">What you walk away with</p>
+    <h2>Something you can <em>act on</em> by Friday.</h2>
+    <div class="cards">
+      <article><span>01</span><h3>Your top five values, in order</h3><p>And three “I am” statements about the whole of you, not just the job title.</p></article>
+      <article><span>02</span><h3>A North Star</h3><p>A short picture of an ordinary week with your first value fully lived. It’s what you test every idea against.</p></article>
+      <article><span>03</span><h3>Ideas from your own words</h3><p>Mixed from what you know, what you do well and what you love. It never tells you an idea is unrealistic.</p></article>
+      <article><span>04</span><h3>One choice, three first steps</h3><p>Placed in your planner with dates, small enough to start this week.</p></article>
+      <article><span>05</span><h3>A Career Direction Report</h3><p>All of it on one page, to keep or to take to someone you trust.</p></article>
+      <article><span>06</span><h3>A coach who has read it</h3><p>Sky, the AI coach in your membership, knows what you found. You never explain it twice.</p></article>
+    </div>
+  </section>
+
+  <section class="band sell" id="price">
+    <p class="label">Price</p>
+    <h2>One membership. <em>No annual trap.</em></h2>
+    <div class="price">
+      <div class="price-big"><b>$25</b><span>a month<span class="t7">, after 7 days free</span></span></div>
+      <ul>
+        <li class="t7">Nothing charged today. We email you three days before the free week ends.</li>
+        <li>The Compass is unlimited, with the planner and notes.</li>
+        <li>Sky, the AI coach, plus the resume and cover letter writers, are in the same membership.</li>
+        <li>Cancel in two taps from the app.</li>
+      </ul>
+      <a class="btn btn-north" href="/join" data-track="cta" data-place="compass-price"><span class="t7">Start the Compass, free for 7 days</span><span class="t0">Start the Compass for $25 a month</span></a>
+      <a class="btn btn-ghost" href="/demo" data-track="demo" data-place="compass-price">Talk to Sky first, no sign-up</a>
+      <p class="fine">Australian dollars. Sky is an AI. Sessions with a human coach are $250 each, only if you want one. For people 18 and over.</p>
+    </div>
+  </section>
+
+  <section class="band" id="questions">
+    <p class="label">Fair questions</p>
+    <h2>Before you start</h2>
+    <div class="faq">
+      <details><summary>Is the two-minute quiz really free?</summary><p>Yes. No email, no account, no paywall on the result. Your answers are scored in your browser and stay on this device.</p></details>
+      <details><summary>Is this a personality test?</summary><p>No. The quiz shows where you are right now on two things, clarity and energy, and that changes. The Compass itself is a guided exercise built on your own words. Neither puts you in a type.</p></details>
+      <details><summary>Will it tell me which job to do?</summary><p>It won’t pick for you. It helps you build ideas from your values and strengths, choose one to test, and take the first steps. It never says whether an idea is realistic or well paid; that part is yours to check.</p></details>
+      <details><summary>How long does the Compass take?</summary><p>Ten short steps. Some people do it in an evening, most spread it over a week or two. It saves as you go.</p></details>
+      <details><summary>Is it therapy?</summary><p>No. It’s coaching, and it doesn’t replace a counsellor, doctor or other health professional. If you’re in a hard place, call your local emergency number or find a helpline near you at <a href="https://findahelpline.com">findahelpline.com</a>.</p></details>
+      <details class="sell"><summary><span class="t7">What happens after the free week?</span><span class="t0">How do I cancel?</span></summary><p>It’s $25 a month until you cancel.<span class="t7"> We email you three days before the first charge.</span> Cancel from Me in the app, two taps, and you won’t be charged again.</p></details>
+    </div>
+  </section>
+
+  <section class="band final">
+    <h2>You don’t need the whole map. <em>Just a bearing.</em></h2>
+    <div class="cta-row">
+      <button class="btn btn-north" type="button" data-start>Find my bearing</button>
+      <a class="btn btn-ghost sell" href="/join" data-track="cta" data-place="compass-final"><span class="t7">Start the Compass, free for 7 days</span><span class="t0">Start the Compass</span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Compass is part of Do With Life. Coaching, not therapy. For people 18 and over.</p>
+  <p>In crisis? Call your local emergency number, or find a helpline near you at <a href="https://findahelpline.com">findahelpline.com</a>.</p>
+  <p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+</footer>
+
+<div class="sticky" id="sticky"><span id="sticky-text">2 minutes · no sign-up</span><button class="btn btn-north" id="sticky-btn" type="button">Find my bearing</button></div>
+
+<script type="module" src="/compass/compass.js"></script>
+<script src="/track.js"></script>
+</body>
+</html>

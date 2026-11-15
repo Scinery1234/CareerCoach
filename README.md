@@ -9,6 +9,7 @@ This branch is a standalone product. It carries the Sky and tools stack from the
 | Path | What it does |
 |---|---|
 | `index.html` | The home page, which the ads also point at. `/join` pays, `/demo` is the no-sign-up demo. |
+| `compass/` | The Compass landing page (`/compass`), under its own brand, Compass by Do With Life: the two-minute bearing quiz scored in the browser with `quiz-logic.js`, a taste of step one, then `/join`. Brand notes: `docs/COMPASS_BRAND.md`. |
 | `app/` | The member app: Today, Coach (Sky), Tools, Me. Plain HTML, CSS and JS, no build step. |
 | `join/`, `demo/`, `memory/`, `admin/` | Paying, the demo, the memory page linked from retention emails, and the admin (members, demo feedback, the content editor, "Is everything working?"). `admin/bookings.html` manages the human coach's availability and bookings. |
 | `api/newpage/*.js` | Serverless endpoints (Vercel). `app.js` is the member endpoint; `checkout.js` sells the membership; `members.js`, `health.js` are admin. Crons: `reminders`, `retention`, `programmail`, `applycheck` (Sunday note about the week's applications, for members who turned it on), `alerts` (hourly: new listings from Adzuna scored for fit, see below). |
