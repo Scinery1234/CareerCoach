@@ -1,18 +1,6 @@
 {
   "framework": null,
   "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "(www\\.)?dowithlife\\.com"
-        }
-      ],
-      "destination": "/compass"
-    }
-  ],
   "redirects": [
     {
       "source": "/:section(join|demo|app|admin|memory)/:rest*",
