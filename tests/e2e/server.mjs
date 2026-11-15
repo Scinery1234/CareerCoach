@@ -2,13 +2,17 @@
 // the fake database, seeded with a member, a base and a tailored resume, and one alert.
 // Serves the member app from the repo and routes /api/newpage/app to the real handler over the fake database.
 import http from 'node:http'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, statSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { fakeSupabase } from '../helpers/fake-supabase.js'
 process.env.JWT_SECRET = 'e2e'; process.env.SUPABASE_URL = 'http://x'; process.env.SUPABASE_SERVICE_KEY = 'k'; process.env.SUPABASE_ANON_KEY = 'k'; process.env.RESEND_API_KEY = 're'; process.env.STRIPE_SECRET_KEY = 'sk'
 process.env.NEWPAGE_MEMORY_KEY ||= Buffer.from(Array.from({ length: 32 }, (_, i) => i * 7 % 256)).toString('base64') // member data is only stored encrypted
 process.env.ANTHROPIC_API_KEY = 'sk-ant-e2e'  // Sky is scripted below; nothing leaves this machine
 process.env.STRIPE_SECRET_KEY ||= 'sk_test_e2e'
+process.env.CRON_SECRET ||= 'e2e-cron-secret'
+process.env.ADMIN_EMAIL ||= 'admin@test.local'
+process.env.ADMIN_PASSWORD_HASH ||= (await import('bcryptjs')).default.hashSync('e2e-admin-password', 4)
+process.env.ADMIN_JWT ||= ''
 process.env.NEXT_PUBLIC_URL = 'http://localhost:4173'
 const ME = { id: '11111111-1111-4111-8111-111111111111', email: 'sam@example.com', name: 'Sam Lee', status: 'active', source: 'tools', plan_started_at: new Date().toISOString(), sessions_included: 0 }
 const now = new Date().toISOString()
@@ -38,7 +42,9 @@ const handlers = {
 const ROOT = new URL('../../', import.meta.url).pathname
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' }
 http.createServer(async (req, res) => {
-  const api = Object.keys(handlers).find(k => req.url.split('?')[0] === k)
+  const apiPath = req.url.split('?')[0]
+  if (apiPath.startsWith('/api/') && !handlers[apiPath] && existsSync(join(ROOT, apiPath + '.js'))) handlers[apiPath] = (await import(join(ROOT, apiPath + '.js'))).default
+  const api = handlers[apiPath] ? apiPath : null
   if (api) {
     let body = ''; for await (const c of req) body += c
     const r = { code: 200, status(c) { r.code = c; return r }, setHeader() { return r }, json(b) { res.writeHead(r.code, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); return r }, end() { res.writeHead(r.code); res.end(); return r } }
@@ -49,9 +55,13 @@ http.createServer(async (req, res) => {
   if (req.url === '/__token') { res.end(signSession(ME.id)); return }
   // Open http://localhost:4173/__login in a browser to click around as the seeded member.
   if (req.url === '/__login') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!doctype html><script>localStorage.setItem('np_app_session', ${JSON.stringify(signSession(ME.id))}); location.replace('/app/index.html#today')</script>`); return }
+  // Static files the way Vercel serves them with cleanUrls: a folder is its index.html, and /x is x.html.
   let p = decodeURIComponent(req.url.split('?')[0].split('#')[0])
-  if (p === '/app' || p === '/app/') p = '/app/index.html'
-  const f = join(ROOT, p)
-  if (existsSync(f) && !f.endsWith('/')) { res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return }
+  const candidates = [p, join(p, 'index.html'), p + '.html']
+  for (const c of candidates) {
+    const f = join(ROOT, c)
+    if (!f.startsWith(ROOT)) break
+    try { if (statSync(f).isFile()) { res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return } } catch { /* try the next */ }
+  }
   res.writeHead(404); res.end('nope ' + p)
 }).listen(4173, () => console.log('ready: open http://localhost:4173/__login to use the app as the seeded member (no AI key: Sky and the writers are off, everything else works)'))
