@@ -48,7 +48,7 @@ test('a demo is an empty member that Sky opens the conversation with: no Sam, no
   const me = (await act(session, { action: 'me' })).body
   assert.equal(me.messages[0].content, DEMO_OPENER)
   assert.deepEqual(me.memory, [])
-  assert.deepEqual(me.member.demo.caps, { messages: 15, docs: 2 })
+  assert.deepEqual(me.member.demo.caps, { messages: 15, docs: null })
   assert.equal(me.plan, null)
   assert.match(DEMO_OPENER, /what should I call you/i)
 })
@@ -102,6 +102,17 @@ test('Sky stops at the demo’s message limit', async () => {
   const r = await act(session, { action: 'coach', coach: 'career', message: 'one more' })
   assert.equal(r.code, 429)
   assert.equal(r.body.code, 'demo_cap')
+})
+
+test('documents have no per-visitor demo limit, and Compass suggestions use none of the allowance', async () => {
+  const session = await start()
+  const id = memberOf(session).id
+  for (let i = 0; i < 10; i++) await demoSpend(id, 'docs')
+  assert.equal((await demoAllowance(id, 'docs')).ok, true, 'ten documents in, still allowed')
+  const before = memberOf(session).demo_docs
+  const r = await act(session, { action: 'compass_suggest', kind: 'mixIdea', data: {}, compass: {} })
+  assert.notEqual(r.body.code, 'demo_cap')
+  assert.equal(memberOf(session).demo_docs, before, 'a Compass suggestion is not counted as a document')
 })
 
 test('keeping a demo alive while someone pays: extends a live demo, never an old one, never a real member', async () => {

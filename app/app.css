@@ -500,3 +500,6 @@ body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bott
 .pick .when-tag { margin-left: 8px; font-size: 13px; }
 .pick .stars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; padding-left: 12px; } .pick .stars > span { flex: 0 0 auto; }
 .pick .stars .chip { font-size: 14px; }
+.summary .kv dt .link-btn { font-size: 13px; font-weight: 600; margin-left: 6px; min-height: 0; padding: 0; }
+.summary .sum-list { margin: 0; padding-left: 20px; }
+.summary .sum-list li { margin: 2px 0; }

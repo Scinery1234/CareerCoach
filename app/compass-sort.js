@@ -10,8 +10,10 @@ export const isGroup = b => b.ideas.length > 1 || !!b.label
 
 // Match the board to the idea list: drop ideas that were removed, add new ones
 // as single items at the bottom, and clear out empty items. Changes in place.
+// The top pick and second follow their item; a pick whose item is gone is cleared.
 export function syncBoard(C) {
   if (!Array.isArray(C.board)) C.board = []
+  const was = new Map(C.board.map(b => [b, pickText(b)]))
   const have = new Set(C.ideas)
   const placed = new Set()
   for (const b of C.board) {
@@ -21,6 +23,11 @@ export function syncBoard(C) {
   // In place, so buttons already on screen keep pointing at the same list.
   for (let i = C.board.length - 1; i >= 0; i--) if (!C.board[i].ideas.length) C.board.splice(i, 1)
   for (const v of C.ideas) if (!placed.has(v)) C.board.push({ label: '', ideas: [v], when: '', star: '' })
+  for (const k of ['first', 'second']) {
+    if (!C[k]) continue
+    const item = [...was].find(([, t]) => t === C[k])?.[0]
+    if (item) C[k] = C.board.includes(item) ? pickText(item) : ''
+  }
   return C.board
 }
 

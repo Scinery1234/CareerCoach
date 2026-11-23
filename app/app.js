@@ -28,11 +28,18 @@ const S = {
 }
 
 async function call(url, body, token = session) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body)
-  })
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body)
+    })
+  } catch {
+    // No answer at all (offline, a dropped connection, or the server didn't respond): the
+    // browser's own "Failed to fetch" means nothing to a person, so say what to do instead.
+    const e = new Error('We couldn’t reach AI Career Coach just then. Check your connection and try again.'); e.code = 'network'; throw e
+  }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) { const e = new Error(data.error || (res.status === 504 || res.status === 502 ? 'That took too long and was stopped. Please try again in a minute.' : res.status === 413 ? 'That’s too big to send. Try something smaller.' : 'Something went wrong. Please try again.')); e.code = data.code; e.status = res.status; throw e }
   return data

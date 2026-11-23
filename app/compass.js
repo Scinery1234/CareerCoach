@@ -6,7 +6,7 @@ import { WHEN, whenLabel, isGroup, syncBoard, stack, takeOut, unstack, itemName,
 const VALUES = ['Achievement', 'Adventure', 'Balance', 'Beauty', 'Belonging', 'Calm', 'Care', 'Community', 'Courage', 'Creativity', 'Culture', 'Curiosity', 'Faith', 'Fairness', 'Family', 'Freedom', 'Friendship', 'Fun', 'Growth', 'Health', 'Home', 'Honesty', 'Hope', 'Humour', 'Independence', 'Joy', 'Justice', 'Kindness', 'Learning', 'Love', 'Loyalty', 'Making a difference', 'Money', 'Nature', 'Peace', 'Purpose', 'Respect', 'Security', 'Simplicity', 'Spirituality', 'Stability', 'Success', 'Teamwork', 'Trust', 'Wisdom']
 export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need', 'Strengths', 'Mix ideas', 'Sort', 'Choose', 'Plan', 'First steps', 'Calendar']
 
-const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '', round: null, lift: null, focus: '' }
+const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '', round: null, lift: null, focus: '', angles: [] }
 const LAST = COMPASS_STEPS.length - 1
 
 // "I am" + whatever they typed. A leading article is lower-cased, and so is a single
@@ -23,6 +23,7 @@ let saveTimer = null
 let dirty = false
 function send(ctx, keepalive) {
   clearTimeout(saveTimer); dirty = false
+  syncBoard(T.C) // so what's saved always matches the idea list
   const req = { action: 'tool_save', tool: 'compass', data: T.C }
   return keepalive ? ctx.beacon('/api/newpage/app', req) : ctx.call('/api/newpage/app', req).catch(() => {})
 }
@@ -173,7 +174,7 @@ export function compassScreen(ctx) {
           h('input', { id: 'cp-mix-' + j, type: 'text', maxlength: '100', placeholder: t.added.length ? 'Another idea?' : 'What work could this be?', 'aria-label': `Idea for mix ${j + 1}`, value: t.idea, oninput: e => { t.idea = e.target.value }, onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addIdea(t.idea.trim(), t); t.idea = ''; t.how = ''; rr() } } }),
           h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { addIdea(t.idea.trim(), t); t.idea = ''; t.how = ''; rr() } }, 'Add')),
         t.how && t.idea && h('p', { class: 'small muted' }, t.how),
-        h('button', { class: 'link-btn blue', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'mixIdea', { know: t.know, do: t.do, love: t.love, avoid: [...t.added, ...C.ideas] }, 'mix' + j); if (r?.idea) { t.idea = r.idea; t.how = r.how; ctx.render() } } }, T.busy === 'mix' + j ? 'Thinking…' : 'Suggest an idea for this mix')))),
+        h('button', { class: 'link-btn blue', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'mixIdea', { know: t.know, do: t.do, love: t.love, avoid: [...t.added, ...C.ideas], skip: T.angles }, 'mix' + j); if (r?.angles) T.angles = [...r.angles, ...T.angles].slice(0, 8); if (r?.idea) { t.idea = r.idea; t.how = r.how; ctx.render() } } }, T.busy === 'mix' + j ? 'Thinking…' : 'Suggest an idea for this mix')))),
       h('div', { class: 'row' },
         !T.showAll && T.trios.length > 5 && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.showAll = true; ctx.render() } }, `Show ${T.trios.length - 5} more`),
         h('button', { class: 'btn btn-secondary', type: 'button', onclick: remix }, 'Remix: 10 new mixes')),
@@ -210,10 +211,11 @@ export function compassScreen(ctx) {
         ? h('p', { class: 'soft' }, 'Added to your planner. ', h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.go('tools', 'planner') }, 'Open the planner'))
         : h('button', { class: 'btn btn-primary', type: 'button', disabled: T.busy === 'place', onclick: async () => {
             T.busy = 'place'; ctx.render()
-            try { for (const s of T.sched) await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); C.placed = true; C.done = true; save(ctx) } catch (e) { T.err = e.message }
+            // Each step is marked once it's in, so trying again after an error doesn't add it twice.
+            try { for (const s of T.sched) if (!s.added) { await ctx.act('task_add', { title: s.title, due: s.date, start: s.time, mins: s.mins }); s.added = true } C.placed = true; C.done = true; save(ctx) } catch (e) { T.err = e.message + (T.sched.some(s => s.added) ? ' The steps already added are in your planner.' : '') }
             T.busy = ''; ctx.render()
           } }, T.busy === 'place' ? 'Adding…' : 'Add to my planner')),
-      steps.length > 0 && summary(ctx, C))
+      summary(ctx, C, go))
   }
 
   const footer = h('div', { class: 'cp-footer' }, h('p', { class: 'small muted', id: 'cp-hint', 'aria-live': 'polite' }),
@@ -344,21 +346,33 @@ function needsLine(n) {
   const parts = [n.pay ? `at least $${Number(n.pay).toLocaleString('en-AU')} a year` : '', n.hours ? `up to ${n.hours} hours a week` : '', n.stress ? `${n.stress.toLowerCase()} stress` : '', n.mode ? n.mode.toLowerCase() : '', n.location].filter(Boolean)
   return parts.join(', ') + (n.other ? `. ${n.other}` : '')
 }
-function summary(ctx, C) {
+function summary(ctx, C, go) {
+  const sorted = syncBoard(C)
+  const ideaLine = b => `${itemName(b)}${isGroup(b) ? ` (${b.ideas.join(', ')})` : ''}${b.when ? `, ${whenLabel(b.when).toLowerCase()}` : ''}`
+  const P = C.plan
+  const stages = [['Now', P.now], ['Building', P.building], ['The move', P.move], ['Longer term', P.longer]].filter(([, v]) => v.trim())
+  const firstSteps = C.actions.filter(a => a.trim())
   const text = [
     `My values: ${C.values.join(', ')}`, `I am: ${C.iAm.join('; ')}`, `My North Star: ${C.north}`,
     `What I need from work: ${needsLine(C.needs)}`,
+    sorted.length ? `My ideas, most alive first: ${sorted.map(ideaLine).join('; ')}` : '',
     `Direction: ${C.first}${C.second ? ` (second: ${C.second})` : ''}`,
-    `Now: ${C.plan.now}`, `Building: ${C.plan.building}`, `The move: ${C.plan.move}`, `Longer term: ${C.plan.longer}`,
-    `First steps: ${C.actions.filter(Boolean).join('; ')}`
-  ].join('\n\n')
+    ...stages.map(([l, v]) => `${l}: ${v}`),
+    `First steps: ${firstSteps.join('; ')}`
+  ].filter(Boolean).join('\n\n')
+  // Each part links back to the step where it was made.
+  const edit = (n, what) => h('button', { class: 'link-btn blue', type: 'button', 'aria-label': `Change ${what}`, onclick: () => go(n) }, 'Change')
+  const part = (label, n, content) => [h('dt', {}, label, ' ', edit(n, label.toLowerCase())), h('dd', {}, content)]
   return h('div', { class: 'card summary' }, h('span', { class: 'label' }, 'Your Compass'),
     h('dl', { class: 'kv' },
-      h('dt', {}, 'Values'), h('dd', {}, C.values.slice(0, 5).join(', ')),
-      h('dt', {}, 'I am'), h('dd', {}, C.iAm.slice(0, 3).join('; ')),
-      h('dt', {}, 'I need'), h('dd', {}, needsLine(C.needs) || '—'),
-      h('dt', {}, 'Direction'), h('dd', {}, C.first || '—')),
-    h('p', { class: 'small' }, C.north),
+      part('Values', 0, C.values.slice(0, 5).join(', ')),
+      part('I am', 1, C.iAm.slice(0, 3).join('; ')),
+      part('North Star', 2, C.north || '—'),
+      part('I need', 3, needsLine(C.needs) || '—'),
+      sorted.length > 0 && part('My ideas', 6, h('ol', { class: 'sum-list' }, sorted.map(b => h('li', {}, ideaLine(b))))),
+      part('Direction', 7, [h('b', {}, C.first || '—'), C.second ? h('span', { class: 'small muted' }, ` Second: ${C.second}`) : null]),
+      part('My plan', 8, stages.length ? h('ul', { class: 'sum-list' }, stages.map(([l, v]) => h('li', {}, h('b', {}, l + ': '), v))) : '—'),
+      part('First steps', 9, firstSteps.length ? h('ul', { class: 'sum-list' }, firstSteps.map(a => h('li', {}, a))) : '—')),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: e => copyText(text, e.currentTarget) }, 'Copy my Compass'),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = 'my-compass.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000) } }, 'Download as text')),

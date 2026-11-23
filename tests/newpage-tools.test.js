@@ -296,7 +296,8 @@ test('mix suggestions use a random angle, not always one job title', () => {
     assert.match(p, /Accounting/)
   }
   assert.ok(seen.size >= 6, 'many angles turn up')
-  assert.deepEqual(COMPASS_TASKS.mixIdea.read({ idea: 'Dog-walking accountant', how: 'Dogs as the side job.' }, null, d), { idea: 'Dog-walking accountant', how: 'Dogs as the side job.' })
+  const r = COMPASS_TASKS.mixIdea.read({ idea: 'Dog-walking accountant', how: 'Dogs as the side job.' }, null, d)
+  assert.equal(r.idea, 'Dog-walking accountant'); assert.equal(r.how, 'Dogs as the side job.')
   const five = pickLenses(5)
   assert.equal(new Set(five).size, 5)
   const c = cleanCompass({ strengths: { know: ['Solar'], do: ['Teach'], love: ['Kids'] } })
@@ -311,4 +312,29 @@ test('syncing the board keeps the same list, so buttons on screen stay live', ()
   syncBoard(C)
   assert.equal(C.board, before)
   assert.deepEqual(C.board.map(b => b.ideas[0]), ['A', 'B'])
+})
+
+test('syncing the board keeps the top pick and second on their item, and clears them when it is gone', () => {
+  const C = { ideas: ['Dog walking', 'Florist'], first: 'Outdoors (starting with: Bush teacher)', second: 'Paramedic',
+    board: [{ label: 'Outdoors', ideas: ['Bush teacher', 'Dog walking'], when: 'long', star: 'Bush teacher' }, { label: '', ideas: ['Paramedic'], when: '', star: '' }] }
+  syncBoard(C)
+  assert.equal(C.first, 'Outdoors', 'the star went with the deleted idea, the group pick stays')
+  assert.equal(C.second, '', 'the picked idea was deleted')
+  const L = { ideas: ['A'], first: 'Not on the list', board: [] }
+  syncBoard(L)
+  assert.equal(L.first, 'Not on the list', 'an older pick that was never on the board is left alone')
+})
+
+test('a mix suggestion avoids the angles the browser says it used recently, and says which it used', () => {
+  const all = Object.keys(IDEA_LENSES)
+  for (let i = 0; i < 40; i++) {
+    const skip = all.slice(0, 5)
+    const d = { know: 'A', do: 'B', love: 'C', avoid: [], skip }
+    const p = COMPASS_TASKS.mixIdea.prompt(null, d)
+    assert.ok(d.angles.length >= 1 && d.angles.every(k => !skip.includes(k)), d.angles.join())
+    for (const k of skip) assert.ok(!p.includes(IDEA_LENSES[k]), k)
+    assert.deepEqual(COMPASS_TASKS.mixIdea.read({ idea: 'X', how: 'Y' }, null, d).angles, d.angles)
+  }
+  assert.equal(pickLenses(3, Math.random, all).length, 3, 'if everything was skipped, any angle will do')
+  assert.equal(new Set(pickLenses(11)).size, 11)
 })
