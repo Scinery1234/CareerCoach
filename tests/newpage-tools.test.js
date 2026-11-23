@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { COACHES, COACH_IDS, isCoach, coachList } from '../lib/newpage-coaches.js'
 import { coachSystem, askJson } from '../lib/newpage-coach.js'
-import { cleanCompass, COMPASS_TASKS } from '../lib/newpage-tools.js'
+import { cleanCompass, COMPASS_TASKS, IDEA_LENSES, pickLenses } from '../lib/newpage-tools.js'
+import { syncBoard, stack, takeOut, unstack, pickText, sortMissing } from '../app/compass-sort.js'
 import { cleanStoredResume, resumeTitle, resumeText, resumeContact } from '../lib/newpage-resume.js'
 import { cleanCover, coverTitle, analyseJob, buildCoverPrompt, COVER_SYSTEM, analysePrompt, gapsPrompt, cleanAnalysis, cleanGaps, reviewPrompt, cleanReview, revisePrompt, cleanAnswers } from '../lib/newpage-cover.js'
 import { reminderEmail } from '../lib/newpage-emails.js'
@@ -38,7 +39,7 @@ test('the coach is told the Compass when there is one', () => {
 
 test('cleanCompass bounds and shapes anything it is given', () => {
   const c = cleanCompass({ step: 99, values: Array(30).fill('x'), north: 'n'.repeat(9999), needs: { pay: 123456789012345 }, strengths: { know: 'nope' }, actions: ['a', 'b', 'c', 'd'], evil: '<script>' })
-  assert.equal(c.step, 9)
+  assert.equal(c.step, 10)
   assert.equal(c.values.length, 10)
   assert.equal(c.north.length, 3000)
   assert.equal(c.needs.pay.length, 12)
@@ -69,7 +70,7 @@ test('Compass ideas get the needs as a fit filter, without pay, and repeats are 
   assert.doesNotMatch(p.slice(p.indexOf('Things the work has to fit')), /90000/)
   const out = COMPASS_TASKS.ideas.read({ ideas: [{ title: 'solar trainer' }, { title: 'School electrician', know: 'Solar' }, { title: 'SCHOOL ELECTRICIAN' }] }, c)
   assert.deepEqual(out.ideas.map(i => i.title), ['School electrician'])
-  assert.equal(COMPASS_TASKS.mixIdea.read({ idea: 'Florist' }, c, { avoid: ['florist'] }).idea, '')
+  assert.equal(COMPASS_TASKS.mixIdea.read({ idea: 'Florist', how: 'x' }, c, { avoid: ['florist'] }).idea, '')
   assert.equal(COMPASS_TASKS.ideas.ready(cleanCompass({})), 'Add at least one thing you know, can do and love first.')
   assert.equal(COMPASS_TASKS.ideas.ready(c), null)
   assert.doesNotMatch(COMPASS_TASKS.plan.prompt(cleanCompass({ first: 'Gardener' })), /\$ a year|Second choice/)
@@ -241,4 +242,73 @@ test('askJson does not retry a genuine 400', async () => {
     await assert.rejects(() => askJson({ system: 's', prompt: 'p', schema: {} }), /too long/)
     assert.equal(calls, 1)
   } finally { globalThis.fetch = saved }
+})
+
+test('saves from before the Sort step move up one step past Mix ideas', () => {
+  assert.equal(cleanCompass({ step: 5 }).step, 5)
+  assert.equal(cleanCompass({ step: 6 }).step, 7, 'old Choose is the new Choose')
+  assert.equal(cleanCompass({ step: 9 }).step, 10)
+  assert.equal(cleanCompass({ v: 2, step: 6 }).step, 6, 'new saves are left alone')
+  assert.equal(cleanCompass(cleanCompass({ step: 7 })).step, 8, 'cleaning twice does not move it twice')
+})
+
+test('the sort board is bounded and cleaned', () => {
+  const c = cleanCompass({ board: [{ label: 'L'.repeat(99), ideas: ['A', 'B'], when: 'medium', star: 'B' }, { ideas: [] }, { ideas: ['C'], when: 'someday' }, 'junk'] })
+  assert.equal(c.board.length, 2)
+  assert.equal(c.board[0].label.length, 60)
+  assert.equal(c.board[0].when, 'medium')
+  assert.equal(c.board[1].when, '')
+  const p = COMPASS_TASKS.plan.prompt(cleanCompass({ first: 'X', board: [{ label: 'Calm in a crisis', ideas: ['Paramedic', 'Vet nurse'], when: 'short' }, { ideas: ['Florist'] }] }))
+  assert.match(p, /most alive first: Calm in a crisis \[Paramedic; Vet nurse\] \(short term\); Florist/)
+  assert.doesNotMatch(COMPASS_TASKS.plan.prompt(cleanCompass({ first: 'X', board: [{ ideas: ['Florist'] }] })), /sorted their ideas/, 'an untouched board is left out')
+})
+
+test('sorting: sync, stack, take out, undo and the saved pick text', () => {
+  const C = { ideas: ['A', 'B', 'C', 'D'], board: [{ label: '', ideas: ['A', 'Gone'], when: '', star: 'Gone' }] }
+  syncBoard(C)
+  assert.deepEqual(C.board.map(b => b.ideas), [['A'], ['B'], ['C'], ['D']])
+  assert.equal(C.board[0].star, '')
+  stack(C.board, 2, 0)
+  assert.deepEqual(C.board.map(b => b.ideas), [['A', 'C'], ['B'], ['D']], 'the target keeps its place')
+  assert.deepEqual(sortMissing(C), ['a label for 1 group', 'a time for 3 items'])
+  C.board[0].label = 'Hands on'
+  C.board[0].star = 'C'
+  assert.equal(pickText(C.board[0]), 'Hands on (starting with: C)')
+  assert.equal(pickText(C.board[1]), 'B')
+  takeOut(C.board, 0, 'C')
+  assert.deepEqual(C.board.map(b => b.ideas), [['A'], ['C'], ['B'], ['D']])
+  assert.equal(C.board[0].label, 'Hands on', 'a named group of one stays a group')
+  stack(C.board, 3, 0); unstack(C.board, 0)
+  assert.deepEqual(C.board.map(b => b.ideas), [['A'], ['D'], ['C'], ['B']])
+  for (const b of C.board) b.when = 'long'
+  assert.deepEqual(sortMissing(C), [])
+  assert.deepEqual(sortMissing({ ideas: ['A'], board: [{ label: '', ideas: ['A'], when: '' }] }), [], 'three ideas or fewer can skip')
+})
+
+test('mix suggestions use a random angle, not always one job title', () => {
+  const d = { know: 'Accounting', do: 'Coaching', love: 'Dogs', avoid: [] }
+  const seen = new Set()
+  for (let i = 0; i < 60; i++) {
+    const p = COMPASS_TASKS.mixIdea.prompt(null, d)
+    const hits = Object.entries(IDEA_LENSES).filter(([, t]) => p.includes(t)).map(([k]) => k)
+    assert.ok(hits.length >= 1 && hits.length <= 2, p)
+    hits.forEach(k => seen.add(k))
+    assert.match(p, /Accounting/)
+  }
+  assert.ok(seen.size >= 6, 'many angles turn up')
+  assert.deepEqual(COMPASS_TASKS.mixIdea.read({ idea: 'Dog-walking accountant', how: 'Dogs as the side job.' }, null, d), { idea: 'Dog-walking accountant', how: 'Dogs as the side job.' })
+  const five = pickLenses(5)
+  assert.equal(new Set(five).size, 5)
+  const c = cleanCompass({ strengths: { know: ['Solar'], do: ['Teach'], love: ['Kids'] } })
+  const p = COMPASS_TASKS.ideas.prompt(c)
+  assert.equal(Object.values(IDEA_LENSES).filter(t => p.includes(t)).length, 5, 'each of the 5 ideas gets its own angle')
+  assert.equal(COMPASS_TASKS.ideas.read({ ideas: [{ title: 'T', how: 'H' }] }, c).ideas[0].how, 'H')
+})
+
+test('syncing the board keeps the same list, so buttons on screen stay live', () => {
+  const C = { ideas: ['A', 'B'], board: [{ label: '', ideas: ['Gone'], when: '', star: '' }] }
+  const before = C.board
+  syncBoard(C)
+  assert.equal(C.board, before)
+  assert.deepEqual(C.board.map(b => b.ideas[0]), ['A', 'B'])
 })

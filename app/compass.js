@@ -1,11 +1,13 @@
-// The Compass: ten short steps from values to first steps, saved to the
+// The Compass: eleven short steps from values to first steps, saved to the
 // member's account. Suggestions come from the server (Claude).
 import { h, todayStr, addDays, words, copyText } from './ui.js'
+import { WHEN, whenLabel, isGroup, syncBoard, stack, takeOut, unstack, itemName, pickText, sortMissing } from './compass-sort.js'
 
 const VALUES = ['Achievement', 'Adventure', 'Balance', 'Beauty', 'Belonging', 'Calm', 'Care', 'Community', 'Courage', 'Creativity', 'Culture', 'Curiosity', 'Faith', 'Fairness', 'Family', 'Freedom', 'Friendship', 'Fun', 'Growth', 'Health', 'Home', 'Honesty', 'Hope', 'Humour', 'Independence', 'Joy', 'Justice', 'Kindness', 'Learning', 'Love', 'Loyalty', 'Making a difference', 'Money', 'Nature', 'Peace', 'Purpose', 'Respect', 'Security', 'Simplicity', 'Spirituality', 'Stability', 'Success', 'Teamwork', 'Trust', 'Wisdom']
-export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need', 'Strengths', 'Mix ideas', 'Choose', 'Plan', 'First steps', 'Calendar']
+export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need', 'Strengths', 'Mix ideas', 'Sort', 'Choose', 'Plan', 'First steps', 'Calendar']
 
-const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '' }
+const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '', round: null, lift: null, focus: '' }
+const LAST = COMPASS_STEPS.length - 1
 
 // "I am" + whatever they typed. A leading article is lower-cased, and so is a single
 // capitalised word ("Learner"); longer input is left as typed so names keep their capitals.
@@ -102,7 +104,8 @@ function missing(C, step) {
   if (step === 3) { const n = C.needs; if (n.pay === '') m.push('lowest pay'); if (!n.hours) m.push('hours a week'); if (!n.stress) m.push('how much stress is OK'); if (!n.mode) m.push('where you want to work') }
   if (step === 4) { for (const [k, l] of [['know', 'thing you know'], ['do', 'thing you can do'], ['love', 'thing you love']]) if (C.strengths[k].length < 3) m.push(`${3 - C.strengths[k].length} more ${l}${3 - C.strengths[k].length === 1 ? '' : 's'}`) }
   if (step === 5 && C.ideas.length < 1) m.push('at least one idea')
-  if (step === 6 && !C.first) m.push('your top pick')
+  if (step === 6) { syncBoard(C); m.push(...sortMissing(C)) }
+  if (step === 7 && !C.first) m.push('your top pick')
   return m
 }
 
@@ -116,7 +119,7 @@ export function compassScreen(ctx) {
   const step = C.step
   const rr = () => { save(ctx); ctx.render() }
   const quiet = () => save(ctx, false)
-  const go = n => { C.step = Math.max(0, Math.min(9, n)); T.err = ''; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
+  const go = n => { C.step = Math.max(0, Math.min(LAST, n)); T.err = ''; T.round = null; T.lift = null; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
   const body = []
 
   if (step === 0) {
@@ -160,39 +163,37 @@ export function compassScreen(ctx) {
     // Remix keeps anything typed but not yet added, so nothing is lost.
     const remix = () => { for (const t of T.trios) { const v = t.idea.trim(); if (v) addIdea(v, t) } T.trios = makeTrios(G); T.showAll = false; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
     const shown = T.showAll ? T.trios : T.trios.slice(0, 5)
-    body.push(h('h3', {}, 'Mix and match'), h('p', { class: 'muted' }, 'Each card mixes one thing you know, one you can do and one you love. Ask: what job or kind of work could bring these together? Skip any that don’t spark anything. Add the ideas you already had too.'),
+    body.push(h('h3', {}, 'Mix and match'), h('p', { class: 'muted' }, 'Each card mixes one thing you know, one you can do and one you love. Ask: how could these fit into my working life? It doesn’t have to be one job. One could be a side job, something you learn, where you work, or who you work for. Skip any that don’t spark anything. Add the ideas you already had too.'),
       h('div', { class: 'card' }, h('span', { class: 'label' }, 'Ideas you already had'), h('p', { class: 'small muted' }, 'Any job or career you’ve thought about before, even years ago. Bank them first.'),
         addRow(ctx, 'cp-idea', 'e.g. Paramedic, opening a café', v => { addIdea(v); save(ctx) })),
       h('div', { class: 'mixgrid' }, shown.map((t, j) => h('div', { class: 'card mix' },
         h('div', { class: 'trio' }, h('span', {}, t.know), '+', h('span', {}, t.do), '+', h('span', {}, t.love)),
         t.added.length > 0 && h('div', { class: 'tags' }, t.added.map(v => h('span', { class: 'tag got' }, '✓ ' + v))),
         h('div', { class: 'add-row' },
-          h('input', { id: 'cp-mix-' + j, type: 'text', maxlength: '100', placeholder: t.added.length ? 'Another idea?' : 'What work could this be?', 'aria-label': `Idea for mix ${j + 1}`, value: t.idea, oninput: e => { t.idea = e.target.value }, onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addIdea(t.idea.trim(), t); t.idea = ''; rr() } } }),
-          h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { addIdea(t.idea.trim(), t); t.idea = ''; rr() } }, 'Add')),
-        h('button', { class: 'link-btn blue', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'mixIdea', { know: t.know, do: t.do, love: t.love, avoid: [...t.added, ...C.ideas] }, 'mix' + j); if (r?.idea) { t.idea = r.idea; ctx.render() } } }, T.busy === 'mix' + j ? 'Thinking…' : 'Suggest an idea for this mix')))),
+          h('input', { id: 'cp-mix-' + j, type: 'text', maxlength: '100', placeholder: t.added.length ? 'Another idea?' : 'What work could this be?', 'aria-label': `Idea for mix ${j + 1}`, value: t.idea, oninput: e => { t.idea = e.target.value }, onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); addIdea(t.idea.trim(), t); t.idea = ''; t.how = ''; rr() } } }),
+          h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { addIdea(t.idea.trim(), t); t.idea = ''; t.how = ''; rr() } }, 'Add')),
+        t.how && t.idea && h('p', { class: 'small muted' }, t.how),
+        h('button', { class: 'link-btn blue', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'mixIdea', { know: t.know, do: t.do, love: t.love, avoid: [...t.added, ...C.ideas] }, 'mix' + j); if (r?.idea) { t.idea = r.idea; t.how = r.how; ctx.render() } } }, T.busy === 'mix' + j ? 'Thinking…' : 'Suggest an idea for this mix')))),
       h('div', { class: 'row' },
         !T.showAll && T.trios.length > 5 && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.showAll = true; ctx.render() } }, `Show ${T.trios.length - 5} more`),
         h('button', { class: 'btn btn-secondary', type: 'button', onclick: remix }, 'Remix: 10 new mixes')),
       h('div', { class: 'card' }, h('span', { class: 'label' }, `Your ideas (${C.ideas.length})`),
         tagList(C.ideas, rr) || h('p', { class: 'muted small' }, 'Ideas you add appear here.'),
         h('button', { class: 'btn btn-secondary', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'ideas', {}, 'ideas'); if (r?.ideas) { T.sugg = r.ideas; ctx.render() } } }, T.busy === 'ideas' ? 'Thinking…' : 'Suggest 5 more ideas from my answers'),
-        (T.sugg || []).map(s => h('div', { class: 'sugg' }, h('b', {}, s.title), h('p', { class: 'small muted' }, `${s.know} + ${s.do} + ${s.love}. ${s.why}`),
+        (T.sugg || []).map(s => h('div', { class: 'sugg' }, h('b', {}, s.title), h('p', { class: 'small muted' }, `${s.know} + ${s.do} + ${s.love}. ${[s.how, s.why].filter(Boolean).join(' ')}`),
           h('button', { class: 'chip', type: 'button', disabled: C.ideas.includes(s.title), onclick: () => { addIdea(s.title); rr() } }, C.ideas.includes(s.title) ? 'Added' : 'Add to my ideas'),
           h('button', { class: 'link-btn', type: 'button', 'aria-label': `Dismiss ${s.title}`, onclick: () => { T.sugg = T.sugg.filter(x => x !== s); ctx.render() } }, 'No thanks')))))
   } else if (step === 6) {
-    body.push(h('h3', {}, 'Choose your direction'), h('p', { class: 'muted' }, 'Notice which ideas light you up. Choose your top pick, and a second if you like. You can always change your mind.'),
-      C.ideas.length ? h('div', { class: 'card' }, C.ideas.map(v => h('div', { class: 'pick' }, h('span', {}, v),
-        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.first === v), onclick: () => { C.first = C.first === v ? '' : v; if (C.second === v) C.second = ''; rr() } }, 'Top pick'),
-        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.second === v), disabled: C.first === v, onclick: () => { C.second = C.second === v ? '' : v; rr() } }, 'Second')))) : h('p', { class: 'muted' }, 'Go back and add some ideas first.'),
-      addRow(ctx, 'cp-idea2', 'Add another idea', v => { if (!C.ideas.includes(v)) C.ideas.push(v); save(ctx) }),
-      h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.askCoach('clarity', 'I’m choosing between some career ideas and I’d like help thinking it through. ') }, 'Stuck? Talk it through with the Clarity Compass coach'))
+    body.push(sortStep(ctx, C, rr, quiet))
   } else if (step === 7) {
+    body.push(chooseStep(ctx, C, rr))
+  } else if (step === 8) {
     const P = C.plan
     const fields = [['now', 'Now (the next 3 months)'], ['building', 'Building (3 to 9 months)'], ['move', 'The move (9 to 18 months)'], ['longer', 'Longer term (18 months and beyond)']]
     body.push(h('h3', {}, 'Sketch your path'), h('p', { class: 'muted' }, `A few sentences each toward ${C.first || 'your direction'}. Rough is fine.`),
       fields.map(([k, label]) => h('div', { class: 'field' }, h('label', { for: 'cp-p-' + k }, label), h('textarea', { id: 'cp-p-' + k, rows: '3', maxlength: '1200', oninput: e => { P[k] = e.target.value; quiet() } }, P[k]))),
       h('button', { class: 'btn btn-secondary', type: 'button', disabled: !!T.busy, onclick: async () => { const r = await suggest(ctx, 'plan', {}, 'plan'); if (r) { for (const [k] of fields) if (!P[k].trim() && r[k]) P[k] = r[k]; rr() } } }, T.busy === 'plan' ? 'Thinking…' : 'Suggest a path for the empty boxes'))
-  } else if (step === 8) {
+  } else if (step === 9) {
     const A = C.actions
     while (A.length < 3) A.push('')
     body.push(h('h3', {}, 'Three small first steps'), h('p', { class: 'muted' }, 'Things you can do in the next two weeks. Each takes under two hours and starts with a doing word: call, write, visit, sign up.'),
@@ -218,7 +219,7 @@ export function compassScreen(ctx) {
   const footer = h('div', { class: 'cp-footer' }, h('p', { class: 'small muted', id: 'cp-hint', 'aria-live': 'polite' }),
     h('div', { class: 'row' },
       step > 0 && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go(step - 1) }, 'Back'),
-      step < 9 && h('button', { id: 'cp-next', class: 'btn btn-primary', type: 'button', onclick: () => { if (missing(C, step).length) { refreshFooter(true); return } go(step + 1) } }, 'Next')))
+      step < LAST && h('button', { id: 'cp-next', class: 'btn btn-primary', type: 'button', onclick: () => { if (missing(C, step).length) { refreshFooter(true); return } go(step + 1) } }, 'Next')))
   function refreshFooter(force) {
     const m = missing(C, step)
     const hint = document.getElementById('cp-hint'), next = document.getElementById('cp-next')
@@ -230,10 +231,113 @@ export function compassScreen(ctx) {
   return h('section', { class: 'screen compass' },
     h('div', {}, back, h('span', { class: 'note' }, 'the compass'), h('h2', {}, COMPASS_STEPS[step])),
     h('div', { class: 'cp-steps', role: 'list', 'aria-label': 'Steps' }, COMPASS_STEPS.map((s, i) => h('span', { role: 'listitem', class: i === step ? 'on' : i < step ? 'past' : '', 'aria-current': i === step ? 'step' : null, 'aria-label': `Step ${i + 1}: ${s}` }))),
-    h('p', { class: 'small muted' }, `Step ${step + 1} of 10 · saved as you go`),
+    h('p', { class: 'small muted' }, `Step ${step + 1} of ${COMPASS_STEPS.length} · saved as you go`),
     T.err && h('p', { class: 'error', role: 'alert' }, T.err),
     h('div', { class: 'cp-body' }, body),
     footer)
+}
+
+// Keep the top pick and second pointing at the same item when its saved text changes.
+function repick(C, b, change) {
+  const old = pickText(b)
+  change()
+  const now = pickText(b)
+  if (C.first === old) C.first = now
+  if (C.second === old) C.second = now
+}
+// After groups are made or undone, a pick that no longer matches anything is cleared.
+function dropStalePicks(C) {
+  const texts = new Set(C.board.map(pickText))
+  if (C.first && !texts.has(C.first)) C.first = ''
+  if (C.second && !texts.has(C.second)) C.second = ''
+}
+
+const ROUNDS = ['Group', 'Rank', 'Time', 'Overview']
+
+// The Sort step: group and label, rank by pull, then place in time.
+function sortStep(ctx, C, rr, quiet) {
+  const B = syncBoard(C)
+  if (T.round == null) T.round = B.length && B.every(b => b.when) ? 3 : 0
+  const to = n => { T.round = n; T.lift = null; T.err = ''; ctx.render(); window.scrollTo({ top: 0 }) }
+  const out = [h('h3', {}, 'Sort your ideas')]
+  if (!B.length) return [...out, h('p', { class: 'muted' }, 'Go back and add some ideas first.')]
+  if (C.ideas.length <= 3) out.push(h('p', { class: 'soft small' }, 'With only a few ideas you can skip this and go straight to choosing. Press Next whenever you like.'))
+  out.push(h('div', { class: 'sort-rounds', role: 'list', 'aria-label': 'Sorting rounds' }, ROUNDS.map((r, i) => h('button', { role: 'listitem', type: 'button', class: 'chip', 'aria-current': T.round === i ? 'step' : null, 'aria-pressed': String(T.round === i), onclick: () => to(i) }, `${i < 3 ? i + 1 + '. ' : ''}${r}`))))
+  const ideasLine = b => isGroup(b) && h('p', { class: 'small muted' }, b.ideas.join(' · '))
+  const timeTag = b => b.when && h('span', { class: 'tag got' }, whenLabel(b.when))
+
+  if (T.round === 0) {
+    const held = T.lift != null ? B[T.lift] : null
+    if (T.focus) { const id = T.focus; T.focus = ''; setTimeout(() => document.getElementById(id)?.focus(), 0) }
+    const put = to => {
+      const target = B[to], wasGroup = isGroup(target)
+      stack(B, T.lift, to)
+      const at = B.indexOf(target)
+      if (!wasGroup || !target.label) T.focus = 'cp-g-' + at
+      T.lift = null; dropStalePicks(C); rr()
+    }
+    out.push(h('p', { class: 'muted' }, 'Like post-its on a table: put ideas that belong together in one pile. Press Move on an idea, then Put it here on another idea or group. Then give each group a name that says what they have in common. It can be a new idea of its own.'),
+      h('p', { class: held ? 'soft' : '', 'aria-live': 'polite' }, held ? `Moving “${itemName(held)}”. Choose where it goes.` : ''),
+      h('div', { class: 'sort-list' }, B.map((b, i) => {
+        const lifted = T.lift === i
+        return h('div', { class: 'card sort-item' + (isGroup(b) ? ' group' : '') + (lifted ? ' lifted' : '') },
+          isGroup(b)
+            ? [h('label', { class: 'flabel', for: 'cp-g-' + i }, `Group of ${b.ideas.length}`),
+                h('input', { id: 'cp-g-' + i, type: 'text', maxlength: '60', placeholder: 'What do these have in common?', value: b.label, oninput: e => { repick(C, b, () => { b.label = e.target.value }); quiet() } }),
+                h('div', { class: 'tags' }, b.ideas.map(v => h('span', { class: 'tag' }, v, b.ideas.length > 1 && h('button', { type: 'button', 'aria-label': `Take ${v} out of the group`, onclick: () => { takeOut(B, i, v); dropStalePicks(C); rr() } }, '×'))))]
+            : h('p', { class: 'v' }, b.ideas[0]),
+          h('div', { class: 'row' },
+            T.lift == null ? h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.lift = i; ctx.render() } }, 'Move')
+              : lifted ? h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { T.lift = null; ctx.render() } }, 'Cancel')
+              : h('button', { class: 'btn btn-primary', type: 'button', 'aria-label': `Put “${itemName(held)}” with ${itemName(b)}`, onclick: () => put(i) }, 'Put it here'),
+            isGroup(b) && T.lift == null && h('button', { class: 'link-btn', type: 'button', onclick: () => { unstack(B, i); dropStalePicks(C); rr() } }, 'Undo group')))
+      })),
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'button', onclick: () => {
+        const unnamed = B.filter(b => b.ideas.length > 1 && !b.label).length
+        if (unnamed) { T.err = `Give ${unnamed === 1 ? 'your group a name' : 'each group a name'} first.`; ctx.render(); return }
+        to(1)
+      } }, 'Next: rank them')))
+  } else if (T.round === 1) {
+    out.push(h('p', { class: 'muted' }, 'Put them in order of how much they pull you. The one that feels most alive goes at the top. Don’t think about how practical it is yet.'),
+      h('ol', { class: 'rank', 'aria-label': 'Your ideas in order of pull' }, B.map((b, i) => h('li', {},
+        h('span', { class: 'n' }, String(i + 1)),
+        h('span', { class: 'v' }, isGroup(b) ? [h('b', {}, itemName(b)), ideasLine(b)] : b.ideas[0]),
+        h('button', { class: 'mv', type: 'button', disabled: i === 0, 'aria-label': `Move ${itemName(b)} up`, onclick: () => { [B[i - 1], B[i]] = [B[i], B[i - 1]]; rr() } }, '↑'),
+        h('button', { class: 'mv', type: 'button', disabled: i === B.length - 1, 'aria-label': `Move ${itemName(b)} down`, onclick: () => { [B[i + 1], B[i]] = [B[i], B[i + 1]]; rr() } }, '↓')))),
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => to(0) }, 'Back to groups'), h('button', { class: 'btn btn-primary', type: 'button', onclick: () => to(2) }, 'Next: when')))
+  } else if (T.round === 2) {
+    out.push(h('p', { class: 'muted' }, 'When could each one happen in your life? There’s no wrong answer. Long term is just as good as short term.'),
+      B.map((b, i) => h('div', { class: 'card' }, h('p', {}, h('b', {}, itemName(b))), ideasLine(b),
+        h('div', { class: 'chips', role: 'group', 'aria-label': `When for ${itemName(b)}` }, WHEN.map(([k, l, hint]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(b.when === k), onclick: () => { b.when = b.when === k ? '' : k; rr() } }, `${l} · ${hint}`))))),
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => to(1) }, 'Back to ranking'), h('button', { class: 'btn btn-primary', type: 'button', onclick: () => to(3) }, 'See it all')))
+  } else {
+    out.push(h('p', { class: 'muted' }, 'Here’s your table of ideas: most alive at the top. Notice what stands out. You can still change anything.'),
+      h('ol', { class: 'rank sort-over' }, B.map((b, i) => h('li', {}, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'v' }, h('b', {}, itemName(b)), ideasLine(b)), timeTag(b) || h('span', { class: 'small muted' }, 'No time yet')))),
+      h('div', { class: 'row' }, ['Change groups', 'Change order', 'Change times'].map((l, i) => h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => to(i) }, l))))
+  }
+  return out
+}
+
+// Choose: the sorted items, most alive first. A group can be picked as a whole,
+// with one idea starred to try first.
+function chooseStep(ctx, C, rr) {
+  const B = syncBoard(C)
+  const pick = (b, which) => {
+    const t = pickText(b)
+    if (which === 'first') { C.first = C.first === t ? '' : t; if (C.second === t) C.second = '' } else C.second = C.second === t ? '' : t
+    rr()
+  }
+  return [h('h3', {}, 'Choose your direction'), h('p', { class: 'muted' }, 'Here are your ideas in the order you ranked them. Notice which ones light you up. Choose your top pick, and a second if you like. If you pick a group, you can star the idea in it to try first. You can always change your mind.'),
+    B.length ? h('div', { class: 'card' }, B.map(b => {
+      const t = pickText(b)
+      return h('div', { class: 'pick' + (isGroup(b) ? ' group' : '') },
+        h('span', {}, isGroup(b) ? h('b', {}, itemName(b)) : b.ideas[0], b.when ? h('span', { class: 'tag got when-tag' }, whenLabel(b.when)) : null),
+        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.first === t), 'aria-label': `Top pick: ${itemName(b)}`, onclick: () => pick(b, 'first') }, 'Top pick'),
+        h('button', { class: 'chip', type: 'button', 'aria-pressed': String(C.second === t), 'aria-label': `Second: ${itemName(b)}`, disabled: C.first === t, onclick: () => pick(b, 'second') }, 'Second'),
+        isGroup(b) && h('div', { class: 'stars', role: 'group', 'aria-label': `Which to try first in ${itemName(b)}` }, h('span', { class: 'small muted' }, 'Try first:'), b.ideas.map(v => h('button', { class: 'chip small', type: 'button', 'aria-pressed': String(b.star === v), 'aria-label': `Try ${v} first`, onclick: () => { repick(C, b, () => { b.star = b.star === v ? '' : v }); rr() } }, (b.star === v ? '★ ' : '☆ ') + v))))
+    })) : h('p', { class: 'muted' }, 'Go back and add some ideas first.'),
+    addRow(ctx, 'cp-idea2', 'Add another idea', v => { if (!C.ideas.includes(v) && C.ideas.length < 30) C.ideas.push(v); save(ctx) }),
+    h('button', { class: 'link-btn blue', type: 'button', onclick: () => ctx.askCoach('clarity', 'I’m choosing between some career ideas and I’d like help thinking it through. ') }, 'Stuck? Talk it through with the Clarity Compass coach')]
 }
 
 function needsLine(n) {

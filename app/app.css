@@ -486,3 +486,17 @@ body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bott
   .sheet-close { display: block; align-self: center; color: var(--muted); font-size: 14px; }
   .demo-scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(21, 32, 59, .35); }
 }
+
+/* ── Compass: Sort step ── */
+.sort-rounds { display: flex; flex-wrap: wrap; gap: 6px; }
+.sort-list { display: flex; flex-direction: column; gap: 10px; }
+.sort-item { display: flex; flex-direction: column; gap: 8px; }
+.sort-item .v { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.sort-item.group { border-left: 6px solid var(--ink); box-shadow: 4px 4px 0 -1px #fff, 4px 4px 0 0 var(--rule), 8px 8px 0 -1px #fff, 8px 8px 0 0 var(--rule); }
+.sort-item.lifted { background: var(--hl); outline: 2px dashed var(--ink); outline-offset: 2px; }
+.sort-item input[type=text] { min-height: 48px; border: 1.5px solid var(--rule); border-radius: 12px; padding: 8px 12px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); width: 100%; }
+.sort-over .v { display: flex; flex-direction: column; }
+.sort-over .v p, .rank .v p { margin: 2px 0 0; }
+.pick .when-tag { margin-left: 8px; font-size: 13px; }
+.pick .stars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; padding-left: 12px; } .pick .stars > span { flex: 0 0 auto; }
+.pick .stars .chip { font-size: 14px; }

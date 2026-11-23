@@ -507,7 +507,7 @@ function toolsScreen() {
   const me = S.me
   const open = me.tasks.filter(t => !t.done).length
   const due = me.tasks.filter(t => !t.done && t.due && t.due <= todayStr()).length
-  compassStatus(ctx).then(c => { const n = c ? (c.done ? 'Finished' : c.step > 0 || c.values.length ? `Step ${c.step + 1} of 10: ${COMPASS_STEPS[c.step]}` : '') : ''; if (n !== compassNote) { compassNote = n; if (S.tab === 'tools' && !S.tool) render() } })
+  compassStatus(ctx).then(c => { const n = c ? (c.done ? 'Finished' : c.step > 0 || c.values.length ? `Step ${c.step + 1} of ${COMPASS_STEPS.length}: ${COMPASS_STEPS[c.step]}` : '') : ''; if (n !== compassNote) { compassNote = n; if (S.tab === 'tools' && !S.tool) render() } })
   const status = { session: me.sessions.upcoming.length ? 'Booked' : me.sessions.remaining ? `${me.sessions.remaining} paid for` : `$${me.prices.hourCents / 100} an hour`, planner: due ? `${due} due today` : open ? `${open} open` : '', compass: compassNote, resume: '', cover: '', apply: me.pipeline?.total ? `${me.pipeline.thisWeek} this week` : '', report: '', linkedin: '', outreach: '', brief: '', progress: '' }
   return h('section', { class: 'screen' },
     h('div', {}, h('span', { class: 'note' }, 'your toolkit'), h('h2', {}, 'Tools'), h('p', { class: 'muted' }, 'These save to your account, and Sky knows about your tasks.')),

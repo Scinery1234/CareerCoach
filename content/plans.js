@@ -84,7 +84,7 @@ export const PLANS = {
         'Choose what to test: lay your top ideas from week 2 beside your values, your strengths and your North Star. Pick a top choice and a second choice, and write one line on why each made the list.',
         'Plan three small experiments for your top two choices: a 20-minute coffee chat with someone doing the work, a free taster (a short course, a webinar, a day of volunteering), and a close read of five job ads. Put each in your calendar with a date, and do the first one this week.'
       ],
-      withNewPage: 'The Compass takes you through all of this in ten short steps: values, who you are, your North Star, what you need, strengths, mixing ideas, choosing, a plan and first steps. You can use your answers from weeks 1 and 2 as you go. It saves to your account, and Sky knows what you find. Your planner schedules each experiment.',
+      withNewPage: 'The Compass takes you through all of this in eleven short steps: values, who you are, your North Star, what you need, strengths, mixing ideas, sorting them, choosing, a plan and first steps. You can use your answers from weeks 1 and 2 as you go. It saves to your account, and Sky knows what you find. Your planner schedules each experiment.',
       tool: 'compass'
     },
     {
@@ -157,7 +157,7 @@ export const PLANS = {
         'Your North Star: write a short paragraph picturing your number one value fully lived by your number one “I am”. Does your target role fit that picture? If it’s close, keep it. If something’s off, switch to one of your other two roles, or write what you’d change.',
         'Write your plan in three lines: Now (the next month), Building (the next 3 to 6 months) and Making the move. The “Now” line is the rest of this program: your resume, your applications, and getting ready for interviews.'
       ],
-      withNewPage: 'The Compass takes you through all of this in ten short steps: values, who you are, your North Star, what you need from work, strengths, choosing, a plan and first steps. It saves to your account, and Sky knows what you find. Sky can help you pressure-test your choice.',
+      withNewPage: 'The Compass takes you through all of this in eleven short steps: values, who you are, your North Star, what you need from work, strengths, mixing and sorting ideas, choosing, a plan and first steps. It saves to your account, and Sky knows what you find. Sky can help you pressure-test your choice.',
       tool: 'compass'
     },
     {
