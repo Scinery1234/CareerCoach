@@ -525,3 +525,4 @@ body.demo-mode #foot { display: none; }
   body.dock-open .paper.app { padding-right: 440px; }
 }
 @media (max-width: 899px) { body.dock-open .paper.app { padding-bottom: calc(min(50dvh, 460px) + 90px); } body.dock-open .cp-footer { display: none; } .sky-dock .sd-note { display: none; } }
+.part { margin: -6px 0 0; font-weight: 700; color: var(--note, #E0573A); font-family: var(--hand); font-size: 20px; }

@@ -4,9 +4,11 @@ import { h, todayStr, addDays, words, copyText } from './ui.js'
 import { WHEN, whenLabel, isGroup, syncBoard, stack, takeOut, unstack, itemName, pickText, sortMissing } from './compass-sort.js'
 
 const VALUES = ['Achievement', 'Adventure', 'Balance', 'Beauty', 'Belonging', 'Calm', 'Care', 'Community', 'Courage', 'Creativity', 'Culture', 'Curiosity', 'Faith', 'Fairness', 'Family', 'Freedom', 'Friendship', 'Fun', 'Growth', 'Health', 'Home', 'Honesty', 'Hope', 'Humour', 'Independence', 'Joy', 'Justice', 'Kindness', 'Learning', 'Love', 'Loyalty', 'Making a difference', 'Money', 'Nature', 'Peace', 'Purpose', 'Respect', 'Security', 'Simplicity', 'Spirituality', 'Stability', 'Success', 'Teamwork', 'Trust', 'Wisdom']
+// Starters for "I am": work and the rest of life, so nobody faces a blank box.
+const IAM_EXAMPLES = ['an electrician', 'an engineer', 'an organiser', 'an early riser', 'an introvert', 'an extrovert', 'a nurse', 'a teacher', 'a tradie', 'a carer', 'a team leader', 'a manager', 'a problem solver', 'a good listener', 'a fast learner', 'a hard worker', 'a people person', 'a numbers person', 'a planner', 'a maker', 'a creative', 'a mentor', 'a volunteer', 'a parent', 'curious', 'calm in a crisis', 'detail-minded', 'starting again']
 export const COMPASS_STEPS = ['Values', 'Who I am', 'North Star', 'What I need', 'Strengths', 'Mix ideas', 'Sort', 'Choose', 'Plan', 'First steps', 'Calendar']
 
-const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '', round: null, lift: null, focus: '', angles: [] }
+const T = { C: null, loading: false, err: '', busy: '', trios: [], seen: new Set(), inp: {}, sched: [], placed: false, notice: '', round: null, lift: null, focus: '', angles: [], phase: 'pick' }
 const LAST = COMPASS_STEPS.length - 1
 
 // "I am" + whatever they typed. A leading article is lower-cased, and so is a single
@@ -137,21 +139,35 @@ export function compassScreen(ctx) {
   const step = C.step
   const rr = () => { save(ctx); ctx.render() }
   const quiet = () => save(ctx, false)
-  const go = n => { C.step = Math.max(0, Math.min(LAST, n)); T.err = ''; T.round = null; T.lift = null; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
+  const go = n => { T.phase = n < C.step ? 'rank' : 'pick'; C.step = Math.max(0, Math.min(LAST, n)); T.err = ''; T.round = null; T.lift = null; save(ctx); ctx.render(); window.scrollTo({ top: 0 }) }
   const body = []
 
+  // Values and "I am" come in two parts: first get them all down, then put them in order.
+  const ordering = (step === 0 || step === 1) && T.phase === 'rank'
+  const partLine = n => h('p', { class: 'small part' }, `Part ${n} of 2: ${n === 1 ? 'get them all down' : 'put them in order'}`)
   if (step === 0) {
-    body.push(h('h3', {}, 'What matters most to you?'), h('p', { class: 'muted' }, 'Tap the values that feel like you. Choose between 5 and 10, then put them in order. The top one is your #1.'),
+    const full = C.values.length >= 10
+    if (!ordering) body.push(h('h3', {}, 'What matters most to you?'), partLine(1), h('p', { class: 'muted' }, 'Tap the values that feel like you. Choose between 5 and 10. Don’t worry about the order yet.'),
+      h('p', { class: 'small', 'aria-live': 'polite' }, h('b', {}, `${C.values.length} of 10 chosen.`), full ? ' That’s the most. To choose another, tap one you’ve chosen to remove it first.' : ''),
       h('div', { class: 'chips' }, [...VALUES, ...C.values.filter(v => !VALUES.includes(v))].map(v => {
         const on = C.values.includes(v)
-        return h('button', { class: 'chip', type: 'button', 'aria-pressed': String(on), disabled: !on && C.values.length >= 10, onclick: () => { if (on) C.values = C.values.filter(x => x !== v); else C.values.push(v); rr() } }, v)
+        return h('button', { class: 'chip', type: 'button', 'aria-pressed': String(on), disabled: !on && full, onclick: () => { if (on) C.values = C.values.filter(x => x !== v); else C.values.push(v); rr() } }, v)
       })),
-      addRow(ctx, 'cp-value', 'Missing one? Add your own', v => { if (C.values.length < 10 && !C.values.includes(v)) C.values.push(v); save(ctx) }),
-      C.values.length > 0 && [h('span', { class: 'label' }, 'Your values in order'), rankList(C.values, rr, 'Your values in order')])
+      !full && addRow(ctx, 'cp-value', 'Missing one? Add your own', v => { if (C.values.length < 10 && !C.values.includes(v)) C.values.push(v); save(ctx) }))
+    else body.push(h('h3', {}, 'Put your values in order'), partLine(2), h('p', { class: 'muted' }, 'Move the one that matters most to the top. It becomes your #1, and the Compass builds on it.'),
+      rankList(C.values, rr, 'Your values in order'))
   } else if (step === 1) {
-    body.push(h('h3', {}, 'Who are you?'), h('p', { class: 'muted' }, 'Finish the sentence “I am…” a few times, like “I am a mum” or “I am curious”: who you’ve been, who you are now, or who you’d love to be. Think about all of your life, not just work. Then put them in order of what feels most true today.'),
-      addRow(ctx, 'cp-iam', 'e.g. a mum, a gardener, curious', v => { const t = iam(v); if (t && !C.iAm.includes(t) && C.iAm.length < 12) C.iAm.push(t); save(ctx) }, 'I am'),
-      C.iAm.length > 0 && rankList(C.iAm, rr, 'Your I am statements in order'))
+    const MAX = 20, full = C.iAm.length >= MAX
+    const addIam = v => { const t = iam(v); if (t && !C.iAm.includes(t) && C.iAm.length < MAX) C.iAm.push(t); save(ctx) }
+    if (!ordering) body.push(h('h3', {}, 'Who are you?'), partLine(1), h('p', { class: 'muted' }, 'Finish the sentence “I am…” as many times as you like: who you’ve been, who you are now, or who you’d love to be. Think about work and the rest of your life. Don’t worry about the order yet.'),
+      full ? h('p', { class: 'soft' }, `That’s ${MAX}, the most you can have. To add another, remove one first.`)
+        : addRow(ctx, 'cp-iam', 'e.g. an electrician, a team leader, curious', addIam, 'I am'),
+      h('p', { class: 'small', 'aria-live': 'polite' }, h('b', {}, `${C.iAm.length} of ${MAX}.`), ' Three or more to go on.'),
+      tagList(C.iAm, rr),
+      !full && h('div', { class: 'card' }, h('span', { class: 'label' }, 'Stuck? Tap any that fit'),
+        h('div', { class: 'chips' }, IAM_EXAMPLES.filter(x => !C.iAm.includes(iam(x))).map(x => h('button', { class: 'chip small', type: 'button', onclick: () => { addIam(x); ctx.render() } }, x)))))
+    else body.push(h('h3', {}, 'Put them in order'), partLine(2), h('p', { class: 'muted' }, 'Order them by what feels most true today. Your #1 shapes your North Star in the next step.'),
+      rankList(C.iAm, rr, 'Your I am statements in order'))
   } else if (step === 2) {
     const wc = h('div', { class: 'small muted', id: 'cp-wc' }, `${words(C.north)} words`)
     body.push(h('h3', {}, 'Your North Star'), h('p', { class: 'muted' }, 'Picture your #1 value fully lived by your #1 “I am”. Describe the most exciting version you can imagine, in any part of life. Work is there to support it.'),
@@ -237,8 +253,8 @@ export function compassScreen(ctx) {
 
   const footer = h('div', { class: 'cp-footer' }, h('p', { class: 'small muted', id: 'cp-hint', 'aria-live': 'polite' }),
     h('div', { class: 'row' },
-      step > 0 && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => go(step - 1) }, 'Back'),
-      step < LAST && h('button', { id: 'cp-next', class: 'btn btn-primary', type: 'button', onclick: () => { if (missing(C, step).length) { refreshFooter(true); return } go(step + 1) } }, 'Next')))
+      (step > 0 || ordering) && h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { if (ordering) { T.phase = 'pick'; ctx.render(); window.scrollTo({ top: 0 }) } else go(step - 1) } }, 'Back'),
+      step < LAST && h('button', { id: 'cp-next', class: 'btn btn-primary', type: 'button', onclick: () => { if (missing(C, step).length) { refreshFooter(true); return } if ((step === 0 || step === 1) && !ordering) { T.phase = 'rank'; ctx.render(); window.scrollTo({ top: 0 }); return } go(step + 1) } }, ordering || (step !== 0 && step !== 1) ? 'Next' : 'Next: put them in order')))
   function refreshFooter(force) {
     const m = missing(C, step)
     const hint = document.getElementById('cp-hint'), next = document.getElementById('cp-next')

@@ -28,13 +28,14 @@ const common = ({ computer }) => async ({ p, shot, text, need, visible, step }) 
     if (/Sam\b/.test(await text())) throw new Error('still mentions Sam')
     if (await p.$eval('#d-start', e => e.disabled)) throw new Error('start button is disabled')
   })
-  await step('Start opens on Sky: its question, starters, an empty panel, and nothing else competing', async () => {
+  await step('Start opens on Sky: its question, starters, an empty panel, the focus picker and the Sky and Tools tabs', async () => {
     await p.click('#d-start'); await p.waitForURL(/\/app/, { timeout: 15000 }); await p.waitForSelector('.demo-screen', { timeout: 15000 })
     await need(/what should I call you/i, 'Sky’s opening question'); await need(/clears in \d+ hours?/, 'demo bar')
     if (!/#coach/.test(p.url())) throw new Error('did not land on the Coach: ' + p.url())
-    if (await visible('#tabbar')) throw new Error('the tab bar is showing')
+    const tabs = await p.$$eval('#tabbar .tab', els => els.map(e => e.textContent.trim()))
+    if (tabs.join() !== 'Sky,Tools') throw new Error('the demo tab bar should be Sky and Tools: ' + tabs.join())
     if (await visible('#signout')) throw new Error('Sign out is showing')
-    if (await p.$('.focus-btn')) throw new Error('the focus chip is showing')
+    if (!(await visible('.demo-head .focus-btn'))) throw new Error('the focus picker is missing')
     if (await visible('#foot')) throw new Error('the page footer is doubling the safety line')
     if (/Sam\b/.test(await text())) throw new Error('Sam is still in the demo')
     const starters = await p.$$eval('.starters .chip', els => els.map(e => e.textContent))
@@ -80,16 +81,15 @@ await run('phone', { width: 390, height: 780 }, common({ computer: false }))
 
 // The way into the tools and back, from the computer layout
 await run('tools', { width: 1240, height: 860 }, async ({ p, need, visible, step }) => {
-  await step('the tools are one link away, with a way back to Sky', async () => {
+  await step('the tools are one link away, with Sky beside them and a tab back', async () => {
     await p.goto(base + '/demo/index.html'); await p.click('#d-start'); await p.waitForSelector('.demo-screen', { timeout: 15000 })
     await p.click('.dk-tools'); await p.waitForSelector('.toolgrid', { timeout: 8000 })
-    await need(/Back to Sky/, 'back link')
+    if (!(await visible('.sky-fab'))) throw new Error('no Ask Sky button on the tools screen')
     const groups = await p.$$eval('h3.group', els => els.map(e => e.textContent.trim()))
     if (groups[0] !== 'Get hired') throw new Error('Get hired should come first: ' + groups.join(' | '))
     const held = await p.$eval('.toolcard.held', e => e.textContent)
     if (!/Career Direction Report/.test(held) || !/Start the Compass first/.test(held)) throw new Error('report not held: ' + held)
-    if (await visible('#tabbar')) throw new Error('tab bar on the tools screen')
-    await p.click('.demo-back'); await p.waitForSelector('.demo-screen', { timeout: 8000 })
+    await p.click('#tabbar .tab >> text=Sky'); await p.waitForSelector('.demo-screen', { timeout: 8000 })
   })
 })
 
