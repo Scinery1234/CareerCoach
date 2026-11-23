@@ -49,12 +49,14 @@ function lightTicks(frac) {
   ;[...ticks.children].forEach((l, i) => l.classList.toggle('lit', i < lit))
 }
 
+const VIEWS = ['intro', 'quiz', 'result', 'intake', 'offer']
 // ── Views ────────────────────────────────────────────────────────
 function show(view) {
-  for (const id of ['intro', 'quiz', 'result']) $(id).hidden = id !== view
+  for (const id of VIEWS) $(id).hidden = id !== view
   document.body.classList.toggle('quizzing', view === 'quiz')
-  document.body.classList.toggle('done', view === 'result')
-  if (view !== 'result') {
+  document.body.classList.toggle('done', ['result', 'intake', 'offer'].includes(view))
+  document.body.classList.toggle('asking', view === 'intake' || view === 'offer')
+  if (view === 'intro' || view === 'quiz') {
     document.body.classList.remove('nosell')
     $('dot').toggleAttribute('hidden', true)
     document.querySelectorAll('#wedges .me, #names .me').forEach(e => e.classList.remove('me'))
@@ -62,7 +64,7 @@ function show(view) {
   }
   setSticky()
 }
-function toTop() { $('top').scrollIntoView({ block: 'start' }) }
+function toTop() { window.scrollTo({ top: 0, behavior: 'instant' }) }
 
 // ── The quiz ─────────────────────────────────────────────────────
 function startQuiz() {
@@ -156,9 +158,9 @@ function renderResult(answers, r = score(answers)) {
         ? `On this plan, the Compass comes in week ${compassWeek}: ten short steps from your values to a direction and three first steps. You can start it tonight, and it remembers where you’re at.`
         : 'The Compass is ten short steps from your values to a direction and three first steps.'),
       h('div', { className: 'cta-row' },
-        cta('/join', 'btn btn-north', 'cta', 'Start the Compass, free for 7 days', 'Start the Compass for $25 a month'),
+        h('button', { type: 'button', className: 'btn btn-north', onclick: () => startIntake(answers, r) }, 'Shape it around me'),
         cta('/demo', 'btn btn-ghost', 'demo', 'Talk to Sky first, no sign-up')),
-      h('p', { className: 'fine t7' }, 'Nothing charged for 7 days, then $25 a month. Cancel in two taps.')),
+      h('p', { className: 'fine' }, 'About six quick questions, written for you as you answer. Still no sign-up.')),
     h('p', { className: 'fine' }, 'This is where you are right now, not a label. It moves, so come back in a few weeks.'),
     h('button', { type: 'button', className: 'linkbtn', onclick: () => { store(null); startQuiz() } }, 'Take it again')
   ].filter(Boolean))
@@ -184,9 +186,112 @@ function cta(href, className, ev, trial, noTrial) {
   return a
 }
 
+// ── The questions written for you ────────────────────────────────
+async function api(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong. Please try again.'), { code: data.code, status: res.status })
+  return data
+}
+const I = { quadrant: '', sit: '', turns: [], goal: '', busy: false }
+const mark = () => { const d = h('span', { className: 'guide', ariaHidden: 'true' }); d.innerHTML = '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 4.5l3.4 11.5L16 27.5 12.6 16z" fill="currentColor" opacity=".28"/><path d="M16 4.5L19.4 16h-6.8z" fill="#FF7A45"/></svg>'; return d }
+const says = (text, id) => h('div', { className: 'says' }, mark(), h('h2', { className: 'bubble', tabIndex: -1, id }, text))
+
+function startIntake(answers, r) {
+  Object.assign(I, { quadrant: r.quadrant, sit: answers.sit, turns: [], goal: '', busy: false })
+  track('intake_start', { quadrant: r.quadrant })
+  show('intake'); nextQuestion(); toTop()
+}
+async function nextQuestion() {
+  if (I.busy) return
+  I.busy = true
+  const box = $('intake')
+  const bar = h('div', { className: 'bar' }, h('i', { style: `width:${Math.min(100, I.turns.length / 7 * 100)}%` }))
+  const top = h('div', { className: 'q-top' },
+    h('button', { type: 'button', className: 'back', onclick: () => { if (I.busy) return; if (I.turns.length) { I.turns.pop(); nextQuestion() } else show('result') } }, '← Back'),
+    h('span', { className: 'count' }, I.turns.length ? `${I.turns.length} answered` : ''))
+  box.replaceChildren(top, bar, says('One moment…', 'i-q'))
+  box.querySelector('.bubble').classList.add('thinking')
+  let step
+  try { step = await api('/api/newpage/demo', { action: 'intake', quadrant: I.quadrant, sit: I.sit, turns: I.turns }) } catch (e) {
+    I.busy = false
+    // No questions on this site (or they are switched off): the page still leads somewhere.
+    if (!I.turns.length && e.status !== 429) { location.href = '/join'; return }
+    box.replaceChildren(top, bar, says(e.message, 'i-q'), h('button', { type: 'button', className: 'btn btn-ghost', onclick: nextQuestion }, 'Try again'))
+    return
+  }
+  I.busy = false
+  if (step.support) {
+    document.body.classList.add('nosell'); setSticky()
+    box.replaceChildren(h('div', { className: 'panel support' }, h('h3', {}, 'First, this'),
+      h('p', {}, 'Thank you for saying so. Careers can wait. If things feel like too much, please talk to someone today: call your local emergency number, or find a free helpline near you at ', h('a', { href: 'https://findahelpline.com' }, 'findahelpline.com'), '.'),
+      h('p', {}, 'Your result will be here when you want it. There’s no rush, and nothing here to buy.')),
+    h('button', { type: 'button', className: 'linkbtn', onclick: () => show('result') }, 'Back to my result'))
+    return
+  }
+  if (step.done) { I.goal = step.goal; track('intake_done'); renderOffer(); return }
+  const answer = a => { a = String(a || '').trim(); if (!a || I.busy) return; I.turns.push({ q: step.question, a }); nextQuestion() }
+  const other = h('input', { type: 'text', className: 'other', placeholder: 'Something else', maxLength: 240, ariaLabel: 'Something else: type your own answer' })
+  const form = h('form', { className: 'other-row', onsubmit: e => { e.preventDefault(); answer(other.value) } }, other, h('button', { type: 'submit', className: 'send', ariaLabel: 'Send my answer' }, '→'))
+  box.replaceChildren(top, bar, says(step.question, 'i-q'),
+    h('div', { className: 'opts', role: 'group', ariaLabel: step.question }, ...step.options.map((o, n) =>
+      h('button', { type: 'button', className: 'opt two', onclick: () => answer(o.label) }, h('kbd', { ariaHidden: 'true' }, String(n + 1)), h('span', {}, h('b', {}, o.label), o.sub && h('small', {}, o.sub))))),
+    form)
+  if (scrollY > 80) toTop()
+  $('i-q').focus({ preventScroll: true })
+}
+document.addEventListener('keydown', e => {
+  if ($('intake').hidden || e.metaKey || e.ctrlKey || e.altKey || e.target.matches?.('input, textarea')) return
+  const btn = Number(e.key) >= 1 && $('intake').querySelectorAll('.opt')[Number(e.key) - 1]
+  if (btn) { e.preventDefault(); btn.click() }
+})
+
+// ── The offer, under their own goal ──────────────────────────────
+function renderOffer() {
+  const name = h('input', { type: 'text', id: 'o-name', autocomplete: 'given-name', required: true, maxLength: 80 })
+  const email = h('input', { type: 'email', id: 'o-email', autocomplete: 'email', required: true, maxLength: 200 })
+  const trap = h('input', { type: 'text', name: 'website', tabIndex: -1, autocomplete: 'off', className: 'trap', ariaHidden: 'true' })
+  const err = h('p', { className: 'err', role: 'alert', hidden: true })
+  const go = h('button', { type: 'submit', className: 'btn btn-north' }, h('span', { className: 't7' }, 'Try for $0'), h('span', { className: 't0' }, 'Start for $25 a month'))
+  const form = h('form', { className: 'join', noValidate: true },
+    h('label', { htmlFor: 'o-name' }, 'Your first name'), name,
+    h('label', { htmlFor: 'o-email' }, 'Your email'), email, trap, err, go,
+    h('p', { className: 'fine' }, h('span', { className: 't7' }, 'Card details on the next page, nothing charged today. Then $25 a month until you cancel, in two taps from the app. '), h('span', { className: 't0' }, 'Pay by card on the next page. $25 a month until you cancel, in two taps from the app. '), 'Australian dollars. Sky is an AI. Coaching, not therapy. For people 18 and over.'))
+  form.onsubmit = async e => {
+    e.preventDefault(); err.hidden = true
+    const fail = (m, el) => { err.textContent = m; err.hidden = false; el?.focus() }
+    if (!name.value.trim()) return fail('Add your name.', name)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) return fail('Add the email you want to use.', email)
+    go.disabled = true
+    track('cta', { place: 'compass-offer' })
+    try {
+      // The answers become Sky's notes on a 24-hour member, which the free week then keeps.
+      const kept = await api('/api/newpage/demo', { action: 'intake_keep', quadrant: I.quadrant, sit: I.sit, turns: I.turns, goal: I.goal, website: trap.value }).catch(() => null)
+      if (kept?.session) { try { if (!localStorage.getItem('np_app_session')) localStorage.setItem('np_app_session', kept.session) } catch {} }
+      const d = await api('/api/newpage/checkout', { action: 'start', plan: 'tools', name: name.value.trim(), email: email.value.trim(), website: trap.value, ...(kept?.session ? { demo: kept.session } : {}) })
+      if (!d.url) throw new Error('Something went wrong. Please try again.')
+      location.href = d.url
+    } catch (ex) { go.disabled = false; fail(ex.message) }
+  }
+  $('offer').replaceChildren(
+    h('p', { className: 'eyebrow' }, 'Your goal, in your words'),
+    h('h2', { className: 'goal', tabIndex: -1, id: 'o-head' }, h('em', {}, I.goal), '.'),
+    h('h3', { className: 'offer-h' }, h('span', { className: 't7' }, 'Try the Compass free for 7 days, built around that.'), h('span', { className: 't0' }, 'Start the Compass, built around that.')),
+    h('ul', { className: 'unlocks' },
+      h('li', {}, h('b', {}, 'The Compass'), 'Ten short steps from your values to a direction and three first steps.'),
+      h('li', {}, h('b', {}, 'Sky, your AI coach'), 'Starts from the answers you just gave, so you don’t explain it twice.'),
+      h('li', {}, h('b', {}, 'A Career Direction Report'), 'Everything you find, on one page.')),
+    h('div', { className: 'panel remind t7' }, h('h3', {}, 'No surprises'), h('p', {}, 'We email you three days before your free week ends. Cancel in two taps and you’re never charged.')),
+    h('div', { className: 'plan' }, h('b', {}, 'Compass membership'), h('span', {}, '$25 a month', h('span', { className: 't7' }, ' after 7 days free'))),
+    form,
+    h('button', { type: 'button', className: 'linkbtn', onclick: () => { I.turns = []; show('intake'); nextQuestion() } }, 'Change my answers'))
+  show('offer'); toTop()
+  $('o-head').focus({ preventScroll: true })
+}
+
 // ── Sticky bar (phones) ──────────────────────────────────────────
 function setSticky() {
-  const done = !$('result').hidden, nosell = document.body.classList.contains('nosell')
+  const done = document.body.classList.contains('done'), nosell = document.body.classList.contains('nosell')
   $('sticky').hidden = done && nosell
   $('sticky-text').textContent = done ? 'Next: the Compass' : '2 minutes · no sign-up'
   $('sticky-btn').textContent = done ? 'Start the Compass' : 'Find my bearing'

@@ -23,6 +23,15 @@ globalThis.fetch = async (url, opts) => {
   const body = JSON.parse(opts.body)
   const last = body.messages.at(-1)
   const ok = o => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } })
+  // The Compass questions, scripted: four questions that echo the last answer, then a goal.
+  if (/intake for the Compass/.test(body.system || '')) {
+    const said = [...last.content.matchAll(/They said: (.*)/g)].map(m => m[1])
+    const step = said.length >= 4
+      ? { support: false, done: true, question: '', options: [], goal: 'Find work that uses my teaching and leaves my evenings free' }
+      : { support: /cannot go on/i.test(said.at(-1) || ''), done: false, goal: '', question: said.length ? `You said “${said.at(-1)}”. What matters most about that?` : 'What is pulling you towards a change?',
+        options: [{ label: 'More time for my life', sub: 'Evenings and weekends back' }, { label: 'Work that means something', sub: 'Helping people directly' }, { label: 'Better pay', sub: 'Enough to stop worrying' }, { label: 'Not sure yet', sub: 'Still working it out' }] }
+    return ok({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(step) }] })
+  }
   if (Array.isArray(last.content) && last.content[0]?.type === 'tool_result') return ok({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Good to meet you, Sam. Four years in aged care is real experience. What would a good change look like for you?' }] })
   if (body.tools?.some(t => t.name === 'save_memory') && !body.messages.some(m => Array.isArray(m.content))) return ok({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu1', name: 'save_memory', input: { note: 'Is called Sam and has worked in aged care for four years.' } }] })
   return ok({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Thanks. Tell me more.' }] })
@@ -51,6 +60,7 @@ http.createServer(async (req, res) => {
   if (req.url === '/__login') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!doctype html><script>localStorage.setItem('np_app_session', ${JSON.stringify(signSession(ME.id))}); location.replace('/app/index.html#today')</script>`); return }
   let p = decodeURIComponent(req.url.split('?')[0].split('#')[0])
   if (p === '/app' || p === '/app/') p = '/app/index.html'
+  if (/^\/(compass|join|demo)\/?$/.test(p)) p = p.replace(/\/?$/, '/index.html')
   const f = join(ROOT, p)
   if (existsSync(f) && !f.endsWith('/')) { res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return }
   res.writeHead(404); res.end('nope ' + p)

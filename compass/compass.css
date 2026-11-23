@@ -118,6 +118,42 @@ body.quizzing .dial-cap { display: none; }
 .opt.on { background: var(--gold); border-color: var(--gold); color: var(--night); font-weight: 700; }
 .opt.on kbd { background: var(--night); color: var(--gold); }
 
+/* The questions written for you */
+.says { display: flex; gap: 12px; align-items: flex-start; }
+.guide { flex: 0 0 44px; height: 44px; color: var(--star); }
+.guide svg { width: 44px; height: 44px; }
+.bubble { font: 400 clamp(24px, 6vw, 34px)/1.12 var(--display); background: rgba(20,27,51,.85); border: 1.5px solid var(--line); border-radius: 4px 18px 18px 18px; padding: 12px 16px; outline: none; }
+.bubble.thinking { color: var(--mute); animation: think 1.2s ease-in-out infinite alternate; }
+@keyframes think { from { opacity: .45; } to { opacity: 1; } }
+.opt.two { align-items: flex-start; padding: 12px 16px; }
+.opt.two span { display: flex; flex-direction: column; gap: 1px; }
+.opt.two b { font-weight: 700; }
+.opt.two small { font-size: 14px; color: var(--mute); font-weight: 400; }
+.other-row { display: flex; gap: 8px; max-width: 560px; }
+.other, .join input { flex: 1; min-width: 0; min-height: 54px; border-radius: 16px; border: 1.5px solid var(--line); background: rgba(11,16,32,.6); color: var(--star); padding: 8px 16px; font: inherit; }
+.other::placeholder { color: var(--mute); }
+.other:focus, .join input:focus { outline: none; border-color: var(--gold); }
+.send { flex: 0 0 54px; border-radius: 16px; border: 0; background: var(--gold); color: var(--night); font-size: 22px; font-weight: 700; cursor: pointer; }
+
+/* The offer */
+#offer { gap: 16px; }
+.goal { font-size: clamp(34px, 8.4vw, 56px); line-height: 1.04; outline: none; }
+.offer-h { font: 700 19px/1.3 var(--body); }
+.unlocks { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.unlocks li { padding-left: 26px; position: relative; color: #D9DCE8; font-size: 16px; }
+.unlocks li::before { content: ''; position: absolute; left: 2px; top: .5em; width: 12px; height: 6px; border-left: 2.5px solid var(--north); border-bottom: 2.5px solid var(--north); transform: rotate(-45deg); }
+.unlocks b { display: block; color: var(--star); }
+.plan { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1.5px solid var(--gold); border-radius: 16px; padding: 14px 16px; background: rgba(255,214,138,.08); max-width: 560px; }
+.plan span { color: var(--gold); font-weight: 700; }
+.join { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.join label { font-size: 14px; font-weight: 700; color: var(--mute); margin-top: 4px; }
+.join .btn { margin-top: 8px; }
+.join .btn[disabled] { opacity: .6; cursor: progress; }
+.trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.err { color: #FFB4A6; font-weight: 500; }
+body.asking .dial { width: min(30vw, 120px); margin: 0; }
+body.asking .dial-cap, body.asking .sticky { display: none; }
+
 /* The result */
 #result { gap: 18px; }
 #result h2 { font-size: clamp(44px, 11vw, 76px); line-height: 1; }
@@ -198,7 +234,8 @@ body.quizzing .sticky { display: none; }
   main { padding-bottom: 48px; }
   .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 56px; align-items: center; padding: 40px 0 64px; }
   .dial-wrap { position: sticky; top: 40px; align-self: start; padding-top: 24px; }
-  .dial, body.quizzing .dial, body.done .dial { width: min(34vw, 400px); }
+  .dial, body.quizzing .dial, body.done .dial, body.asking .dial { width: min(34vw, 400px); }
+  body.asking .dial-cap { display: block; }
   body.quizzing .dial-cap { display: block; }
   .lead { font-size: 20px; }
   .opts { max-width: 560px; }

@@ -4,6 +4,8 @@ import { requireAdmin } from '../../lib/auth.js'
 import { readToken } from '../../lib/newpage-auth.js'
 import { createDemoMember, DEMO, sweepDemos } from '../../lib/newpage-demo.js'
 import { openVault } from '../../lib/newpage-vault.js'
+import { askJson } from '../../lib/newpage-coach.js'
+import { cleanIntake, cleanStep, intakePrompt, intakeNotes, intakeOpener, INTAKE_SYSTEM, INTAKE_SCHEMA } from '../../lib/newpage-intake.js'
 
 const clip = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '')
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -12,6 +14,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 //   POST { action: 'info' }                         does the demo need a code? what are the limits?
 //   POST { action: 'start', code? }                 a 24-hour demo member -> { session }
 //   POST { action: 'feedback', token, screen, rating?, comment, email? }
+//   POST { action: 'intake', quadrant, sit, turns }          the Compass questions: the next question, or the goal -> { question, options } | { done, goal }
+//   POST { action: 'intake_keep', quadrant, sit, turns, goal }  a demo member holding those answers as Sky's notes -> { session }
 //   GET  (admin)                                    feedback and demo numbers
 //   POST { action: 'code', code, label?, maxUses? } (admin) add an invite code; { action: 'code_off', code } to stop one
 export default async function handler(req, res) {
@@ -45,7 +49,8 @@ export default async function handler(req, res) {
     return res.json({ ok: true, code })
   }
 
-  if (!rateLimit(req, res, { max: 30, windowMs: 60 * 60 * 1000, key: 'np-demo' })) return
+  // The Compass questions are several calls per visitor, so they have their own, larger allowance below.
+  if (b.action !== 'intake' && !rateLimit(req, res, { max: 30, windowMs: 60 * 60 * 1000, key: 'np-demo' })) return
   if (isBot(b)) return res.json({ ok: true })
 
   const { data: activeCodes } = await supabase.from('newpage_demo_codes').select('code, uses, max_uses').eq('active', true)
@@ -55,7 +60,25 @@ export default async function handler(req, res) {
   const available = !!process.env.ANTHROPIC_API_KEY
   if (b.action === 'info') return res.json({ needsCode, available, caps: DEMO.caps, hours: DEMO.hours })
 
-  if (b.action === 'start') {
+  // The Compass questions. Nothing is stored: the browser sends the answers so far each time.
+  if (b.action === 'intake') {
+    if (!available) return res.status(503).json({ error: 'The questions aren’t switched on yet.', code: 'unavailable' })
+    if (!rateLimit(req, res, { max: 80, windowMs: 60 * 60 * 1000, key: 'np-intake' })) return
+    const intake = cleanIntake(b)
+    try {
+      const raw = await askJson({ system: INTAKE_SYSTEM, prompt: intakePrompt(intake), schema: INTAKE_SCHEMA, maxTokens: 500, effort: 'low' })
+      return res.json(cleanStep(raw, intake))
+    } catch (err) {
+      console.error('Intake failed:', err)
+      return res.status(502).json({ error: 'That question didn’t load. Please try again.' })
+    }
+  }
+
+  const keep = b.action === 'intake_keep' ? cleanIntake(b) : null
+  if (keep && !keep.turns.length) return res.status(400).json({ error: 'There are no answers to keep.' })
+  if (keep && needsCode) return res.status(403).json({ error: 'The demo needs an invite code at the moment.', code: 'code' })
+
+  if (b.action === 'start' || keep) {
     if (!available) return res.status(503).json({ error: 'The demo is being set up and Sky isn’t switched on yet. Please check back soon.', code: 'unavailable' })
     if (!rateLimit(req, res, { max: 5, windowMs: 60 * 60 * 1000, key: 'np-demo-start' })) return
     let code = null
@@ -71,6 +94,11 @@ export default async function handler(req, res) {
       const made = await createDemoMember({ code, seal: null })
       const { data: m } = await supabase.from('newpage_members').select('*').eq('id', made.id).maybeSingle()
       const vault = m ? await openVault(m, { create: true }) : null
+      if (keep) {
+        // Someone who answered the Compass questions: Sky starts with those answers as its notes.
+        await supabase.from('newpage_memory').insert(intakeNotes(keep).map(note => ({ member_id: made.id, note })))
+        await supabase.from('newpage_messages').update({ content: intakeOpener(keep.goal) }).eq('member_id', made.id)
+      }
       if (vault) {
         const { data: notes } = await supabase.from('newpage_memory').select('id, note').eq('member_id', made.id)
         for (const n of notes || []) await supabase.from('newpage_memory').update({ note: vault.text('mem', n.note) }).eq('id', n.id)
