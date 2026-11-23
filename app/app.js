@@ -1,7 +1,7 @@
 import { STATEMENTS, SCALE, FEELINGS, QUADRANTS } from '/quiz-logic.js'
 import { h, todayStr } from './ui.js'
 import { plannerScreen } from './planner.js'
-import { compassScreen, compassStatus, COMPASS_STEPS } from './compass.js'
+import { compassScreen, compassStatus, COMPASS_STEPS, compassFlush, compassWhere, compassMerge } from './compass.js'
 import { docsScreen } from './docs.js'
 import { applyScreen, pipelineCard, offerCard, alertsCard } from './apply.js'
 import { sessionScreen } from './session.js'
@@ -222,9 +222,11 @@ function taskList(tasks, limit) {
       h('button', { class: 'btn btn-secondary', type: 'submit' }, 'Add')))
 }
 
+// From inside a tool, Sky opens in the panel beside it, so the tool stays on screen.
 function askCoach(text, coach = 'career') {
   S.coachDraft = text
-  openCoach(coach)
+  if (S.tab === 'tools' && S.tool) openDock(coach)
+  else openCoach(coach)
 }
 
 function openLesson(id) {
@@ -247,7 +249,7 @@ const ctx = {
   beacon: (url, body) => { try { fetch(url, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session}` }, body: JSON.stringify(body) }) } catch {} },
   act, buy: (action, body) => buy(action, body), render: () => render(), go: (tab, sub) => go(tab, sub),
   askCoach: (coach, text) => askCoach(text, coach),
-  setFocus: id => { if (id !== S.coach) openCoach(id); else go('coach') }
+  setFocus: id => { if (dockShown() && S.dock === 'open') openDock(id, true); else if (id !== S.coach) openCoach(id); else go('coach') }
 }
 
 window.__npCtx = ctx
@@ -398,28 +400,37 @@ function planScreen() {
 }
 
 // ── Coach ────────────────────────────────────────────────────────
+// One way to talk to Sky, from the Coach tab or the Sky panel on any other screen.
+// With the Compass open beside the chat, Sky gets the Compass as it is on screen and the
+// step they're on, and ideas Sky adds go straight into the Compass.
+async function sendCoach(text) {
+  const me = S.me
+  text = String(text || '').trim()
+  if (!text || S.coachSending) return
+  S.coachSending = true; S.coachError = ''; S.crisis = false; S.coachUsed = true
+  me.messages = [...me.messages, { role: 'user', content: text }]
+  S.coachDraft = ''
+  render(); scrollChat()
+  try {
+    const inCompass = S.tab === 'tools' && S.tool === 'compass'
+    if (inCompass) await compassFlush(ctx)
+    const data = await act('coach', { message: text, coach: S.coach, ...(inCompass ? { where: compassWhere() } : {}) })
+    if (data?.crisis) S.crisis = true
+    if (data?.compassAdded?.length) compassMerge(ctx, data.compassAdded)
+  } catch (err) {
+    me.messages = me.messages.slice(0, -1)
+    S.coachDraft = text
+    S.coachError = err.code === 'demo_cap' ? err.message + ' ' : err.message
+  }
+  S.coachSending = false
+  render(); scrollChat()
+}
+
 function coachScreen() {
   const me = S.me
   const info = me.coaches.find(c => c.id === S.coach) || me.coaches[0]
   const starters = info.starters
-  const send = async text => {
-    text = text.trim()
-    if (!text || S.coachSending) return
-    S.coachSending = true; S.coachError = ''; S.crisis = false; S.coachUsed = true
-    me.messages = [...me.messages, { role: 'user', content: text }]
-    S.coachDraft = ''
-    render(); scrollChat()
-    try {
-      const data = await act('coach', { message: text, coach: S.coach })
-      if (data?.crisis) S.crisis = true
-    } catch (err) {
-      me.messages = me.messages.slice(0, -1)
-      S.coachDraft = text
-      S.coachError = err.code === 'demo_cap' ? err.message + ' ' : err.message
-    }
-    S.coachSending = false
-    render(); scrollChat()
-  }
+  const send = sendCoach
   if (me.member.demo) return demoCoach(me, send)
   return h('section', { class: 'screen chat' },
     h('div', { class: 'sky-head' },
@@ -477,7 +488,51 @@ function membershipCard(me) {
     h('p', { class: 'small' }, `Sessions with a human career coach are $${me.prices.hourCents / 100} an hour, bought and booked under Tools.`))
 }
 
-function scrollChat() { const m = document.getElementById('msgs'); if (m) m.lastElementChild?.scrollIntoView({ block: 'end' }) }
+function scrollChat() {
+  const m = document.getElementById('msgs'); if (m) m.lastElementChild?.scrollIntoView({ block: 'end' })
+  const d = document.getElementById('dock-msgs'); if (d) d.scrollTop = d.scrollHeight
+}
+
+// ── The Sky panel: on every screen but the Coach tab, open or minimised ──
+const DOCK_KEY = 'np_dock'
+S.dock = (() => { try { return localStorage.getItem(DOCK_KEY) === 'open' ? 'open' : 'min' } catch { return 'min' } })()
+const dockShown = () => S.screen === 'app' && !!S.me && S.tab !== 'coach'
+function setDock(v) { S.dock = v; try { localStorage.setItem(DOCK_KEY, v) } catch {} render(); if (v === 'open') setTimeout(() => { scrollChat(); document.getElementById('dock-box')?.focus() }, 0) }
+// Opens the panel, on another focus if asked. A tool's own suggestion of a focus doesn't move a
+// demo off its getting-to-know-you conversation; picking one from the focus list always does.
+async function openDock(coach, picked = false) {
+  const change = coach && coach !== S.coach && (picked || !S.me.member.demo)
+  if (change) { S.coach = coach; S.coachError = '' }
+  setDock('open')
+  if (change) { try { await act('me') } catch (e) { S.coachError = e.message } render(); scrollChat() }
+}
+function skyDock() {
+  if (!dockShown()) return null
+  const me = S.me
+  if (S.dock !== 'open') return h('button', { class: 'sky-fab', type: 'button', 'aria-label': 'Open Sky, your AI coach', onclick: () => setDock('open') }, focusIcon(S.coach, 26), h('span', {}, 'Ask Sky'))
+  const info = me.coaches.find(c => c.id === S.coach) || me.coaches[0]
+  const inCompass = S.tab === 'tools' && S.tool === 'compass'
+  const msgs = me.messages.slice(-40)
+  return h('section', { class: 'sky-dock', role: 'dialog', 'aria-label': 'Sky, your AI coach' },
+    h('div', { class: 'sd-head' },
+      h('b', {}, 'Sky'),
+      h('button', { class: 'chip focus-btn small', type: 'button', 'aria-haspopup': 'dialog', 'aria-label': `Focus: ${info.name}. Change focus`, onclick: () => openSky(ctx) }, focusIcon(info.id, 20), info.name, ' ▾'),
+      h('span', { class: 'sd-acts' },
+        h('button', { class: 'link-btn', type: 'button', onclick: () => go('coach') }, 'Full screen'),
+        h('button', { class: 'sd-min', type: 'button', 'aria-label': 'Minimise Sky', onclick: () => setDock('min') }, '–'))),
+    inCompass && h('p', { class: 'small muted sd-note' }, 'Sky can see your Compass and the step you’re on, and can add ideas to it when you say yes.'),
+    S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'), h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),
+    h('div', { class: 'msgs sd-msgs', id: 'dock-msgs', 'aria-live': 'polite' },
+      msgs.length ? msgs.map(m => h('div', { class: `msg ${m.role}` }, m.role === 'assistant' ? inline(m.content) : m.content))
+        : h('div', { class: 'msg assistant' }, `Hi${me.member.name ? ' ' + me.member.name.split(' ')[0] : ''}. ${info.open}`),
+      S.coachSending && h('div', { class: 'msg assistant typing', 'aria-label': 'Sky is typing' }, '···')),
+    inCompass && !S.coachSending && h('div', { class: 'starters' }, ['Help me with this step', 'Suggest some ideas from my answers'].map(t => h('button', { class: 'chip small', type: 'button', onclick: () => sendCoach(t) }, t))),
+    S.coachError && h('p', { class: 'error', role: 'alert' }, S.coachError),
+    !me.coachOn && h('p', { class: 'soft small' }, 'Sky isn’t switched on yet.'),
+    h('form', { class: 'composer sd-composer', onsubmit: e => { e.preventDefault(); sendCoach(S.coachDraft) } },
+      h('textarea', { id: 'dock-box', rows: '1', maxlength: '2000', placeholder: 'Ask Sky…', 'aria-label': 'Message Sky', disabled: !me.coachOn, oninput: e => { S.coachDraft = e.target.value; const b = document.getElementById('dock-send'); if (b) b.disabled = S.coachSending || !S.coachDraft.trim() }, onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCoach(S.coachDraft) } } }, S.coachDraft),
+      h('button', { id: 'dock-send', class: 'btn btn-primary', type: 'submit', disabled: S.coachSending || !me.coachOn || !S.coachDraft.trim() }, 'Send')))
+}
 
 // ── Tools ────────────────────────────────────────────────────────
 const TOOL_GROUPS = [
@@ -606,11 +661,13 @@ function go(tab, sub) {
 
 function renderTabs() {
   const show = S.me && !['login', 'sent', 'loading', 'noaccess'].includes(S.screen)
-  const chrome = show && !S.me.member.demo      // a demo visitor gets no tab bar and no Sign out
-  tabbar.hidden = !chrome
-  signoutBtn.hidden = !chrome
-  if (!chrome) return
-  tabbar.replaceChildren(h('div', { class: 'tabbar-in' }, TABS.filter(([k]) => !(k === 'plan' && S.me.member.plan === 'tools')).map(([k, label]) => {
+  const demo = show && !!S.me.member.demo
+  tabbar.hidden = !show
+  signoutBtn.hidden = !show || demo   // a demo visitor has nothing to sign out of
+  if (!show) return
+  // A demo visitor gets Sky and the tools; the rest needs an account.
+  const tabs = demo ? [['coach', 'Sky'], ['tools', 'Tools']] : TABS.filter(([k]) => !(k === 'plan' && S.me.member.plan === 'tools'))
+  tabbar.replaceChildren(h('div', { class: 'tabbar-in' }, tabs.map(([k, label]) => {
     const needsCheckin = k === 'me' && !S.me.plan
     const btn = h('button', { class: 'tab', type: 'button', 'aria-current': S.tab === k ? 'page' : null, onclick: () => { go(k); if (k === 'coach' && !skySeen()) setTimeout(() => openSky(ctx), 250) } }, label, needsCheckin && h('span', { class: 'dotbadge', 'aria-label': 'Check-in needed' }))
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -634,8 +691,8 @@ function render() {
   // A demo visitor has no tab bar: one screen, Sky, and a way back to it from anywhere else.
   const demo = S.screen === 'app' && !!S.me?.member?.demo
   document.body.classList.toggle('demo-mode', demo)
-  if (demo && (S.tab !== 'coach' || S.lessonId)) node = h('div', {}, h('button', { class: 'link-btn blue demo-back', type: 'button', onclick: () => { S.lessonId = null; S.tool = null; go('coach') } }, '← Back to Sky'), node)
-  app.replaceChildren(node)
+  document.body.classList.toggle('dock-open', dockShown() && S.dock === 'open')
+  app.replaceChildren(node, skyDock() || '')
   renderDemoBar()
   document.querySelector('.paper')?.classList.toggle('wide', S.screen === 'app' && ((S.tab === 'tools' && !!S.tool) || S.tab === 'today' || S.tab === 'plan' || (demo && S.tab === 'coach')))
   renderTabs()
@@ -683,7 +740,7 @@ function demoPanel(me) {
           S.keepErr && h('p', { class: 'error', role: 'alert' }, S.keepErr),
           h('div', { class: 'row' }, h('button', { class: 'btn btn-primary', type: 'submit', disabled: S.keepBusy }, S.keepBusy ? 'Taking you to Stripe…' : 'Keep it'), h('button', { class: 'link-btn', type: 'button', onclick: () => { S.keepOpen = false; render() } }, 'Not now'))),
       h('p', { class: 'small muted' }, `This clears itself ${clearsIn(d)}. Join to keep it, and Sky picks up where you left off. Free for 7 days, then $25 a month, cancel in two taps. By joining you agree to our `, h('a', { href: '/terms', target: '_blank', rel: 'noopener' }, 'Terms'), ' and ', h('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.')),
-    h('button', { class: 'link-btn blue dk-tools', type: 'button', onclick: () => { S.sheetOpen = false; go('tools') } }, 'Explore the writing tools'),
+    h('button', { class: 'link-btn blue dk-tools', type: 'button', onclick: () => { S.sheetOpen = false; go('tools') } }, 'Open the tools: the Compass, resume and letters'),
     h('button', { class: 'link-btn sheet-close', type: 'button', onclick: () => { S.sheetOpen = false; render() } }, 'Close'))
 }
 
@@ -693,7 +750,8 @@ function demoCoach(me, send) {
   return h('section', { class: 'screen chat demo-screen' },
     h('div', { class: 'demo-grid' },
       h('div', { class: 'demo-chat' },
-        h('div', { class: 'demo-head' }, h('h2', {}, 'Sky'), h('span', { class: 'hand' }, 'your AI career coach')),
+        h('div', { class: 'demo-head' }, h('h2', {}, 'Sky'), h('span', { class: 'hand' }, 'your AI career coach'),
+          (() => { const info = me.coaches.find(c => c.id === S.coach) || me.coaches[0]; return h('button', { class: 'chip focus-btn', type: 'button', 'aria-haspopup': 'dialog', onclick: () => openSky(ctx) }, focusIcon(info.id, 22), h('span', { class: 'muted' }, 'Focus: '), h('b', {}, info.name), ' ▾') })()),
         !me.coachOn && h('p', { class: 'soft' }, 'Sky isn’t available right now. Please try the demo again a little later.'),
         S.crisis && h('div', { class: 'crisis', role: 'alert' }, h('b', {}, 'Support is available right now'),
           h('p', {}, 'Call your local emergency number, or find a helpline near you at findahelpline.com. In Australia: Lifeline 13 11 14, any time.')),

@@ -440,9 +440,6 @@ input.sr-only:focus-visible + label.btn { outline: 3px solid var(--ink); outline
 .toolcard.held { opacity: .7; border-style: dashed; }
 
 body.demo-mode #foot { display: none; }
-body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-@media (min-width: 900px) { body.demo-mode .paper.app { padding-left: 0; padding-bottom: 12px; } }
-.demo-back { margin: 4px 0 10px; }
 .demo-screen { gap: 0; }
 .demo-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .demo-chat { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: calc(100dvh - 180px); }
@@ -451,6 +448,7 @@ body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bott
 .demo-head .hand { font: 600 21px var(--hand); color: var(--note); }
 .demo-chat .msgs { min-height: 0; flex: 1 1 auto; }
 .demo-dock { position: sticky; bottom: 0; z-index: 5; background: #fff; padding-top: 6px; }
+@media (max-width: 899px) { .demo-dock { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); } }  /* clear of the tab bar, with nothing showing through */
 .demo-dock .composer { position: static; border-top: 0; box-shadow: none; padding: 6px 0 0; }
 .fine { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 
@@ -503,3 +501,27 @@ body.demo-mode .paper.app { padding-bottom: calc(12px + env(safe-area-inset-bott
 .summary .kv dt .link-btn { font-size: 13px; font-weight: 600; margin-left: 6px; min-height: 0; padding: 0; }
 .summary .sum-list { margin: 0; padding-left: 20px; }
 .summary .sum-list li { margin: 2px 0; }
+
+/* ── Sky panel: on every screen but the Coach tab, open beside the work or minimised ── */
+.sky-fab { position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 18px 6px 10px; border-radius: 99px; border: 2px solid var(--ink); background: var(--hl); color: var(--ink); font: 700 16px var(--body); cursor: pointer; box-shadow: 0 6px 18px rgba(21,32,59,.22); }
+.sky-dock { position: fixed; z-index: 30; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); height: min(50dvh, 460px); display: flex; flex-direction: column; gap: 8px; background: #fff; border: 2px solid var(--ink); border-radius: 18px; padding: 10px 12px; box-shadow: 0 12px 36px rgba(21,32,59,.28); }
+.sd-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sd-head > b { font-family: var(--display); font-size: 20px; }
+.sd-head .focus-btn { font-size: 14px; min-height: 36px; }
+.sd-acts { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.sd-acts .link-btn { font-size: 14px; }
+.sd-min { border: 0; background: none; font-size: 26px; line-height: 1; min-width: 44px; min-height: 44px; cursor: pointer; color: var(--ink); border-radius: 10px; }
+.sd-note { margin: 0; }
+.sd-msgs { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding-right: 2px; }
+.sd-msgs .msg { font-size: 15px; }
+.sky-dock .starters { display: flex; flex-wrap: wrap; gap: 6px; }
+.sky-dock .composer { position: static; box-shadow: none; padding: 6px 0 0; }
+.sky-dock .composer textarea { min-height: 44px; }
+.sky-dock .composer .btn { min-height: 44px; }
+@media (min-width: 900px) {
+  .sky-fab { bottom: 24px; right: 24px; }
+  .sky-dock { left: auto; right: 24px; bottom: 24px; width: 400px; height: min(640px, calc(100dvh - 48px)); }
+  /* With the panel open, the page makes room on the right instead of hiding under it. */
+  body.dock-open .paper.app { padding-right: 440px; }
+}
+@media (max-width: 899px) { body.dock-open .paper.app { padding-bottom: calc(min(50dvh, 460px) + 90px); } body.dock-open .cp-footer { display: none; } .sky-dock .sd-note { display: none; } }

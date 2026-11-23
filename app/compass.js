@@ -43,6 +43,23 @@ function hook(ctx) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush() })
 }
 
+// For Sky: send anything typed but not yet saved, so Sky sees the Compass as it is on screen.
+export async function compassFlush(ctx) {
+  if (dirty && T.C) await send(ctx, false)
+}
+// Where they are in the Compass, when it's on screen beside the chat.
+export const compassWhere = () => (T.C ? { compassStep: T.C.step } : null)
+// Sky added ideas: bring them in without touching anything else on screen. They come with
+// Sky's reply, so a save made while Sky was answering can't lose them.
+export function compassMerge(ctx, ideas) {
+  if (!T.C || !Array.isArray(ideas)) return
+  try {
+    let n = 0
+    for (const v of ideas) if (!T.C.ideas.includes(v) && T.C.ideas.length < 30) { T.C.ideas.push(v); n++ }
+    if (n) { T.notice = `Sky added ${n} idea${n === 1 ? '' : 's'} to your list.`; syncBoard(T.C); save(ctx) }
+  } catch {}
+}
+
 export async function compassStatus(ctx) {
   if (!T.C) { try { T.C = (await ctx.call('/api/newpage/app', { action: 'tool_get', tool: 'compass' })).data } catch {} }
   return T.C
@@ -235,6 +252,7 @@ export function compassScreen(ctx) {
     h('div', { class: 'cp-steps', role: 'list', 'aria-label': 'Steps' }, COMPASS_STEPS.map((s, i) => h('span', { role: 'listitem', class: i === step ? 'on' : i < step ? 'past' : '', 'aria-current': i === step ? 'step' : null, 'aria-label': `Step ${i + 1}: ${s}` }))),
     h('p', { class: 'small muted' }, `Step ${step + 1} of ${COMPASS_STEPS.length} · saved as you go`),
     T.err && h('p', { class: 'error', role: 'alert' }, T.err),
+    T.notice && h('p', { class: 'soft', role: 'status' }, T.notice, ' ', h('button', { class: 'link-btn', type: 'button', onclick: () => { T.notice = ''; ctx.render() } }, 'OK')),
     h('div', { class: 'cp-body' }, body),
     footer)
 }

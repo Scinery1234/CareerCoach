@@ -23,7 +23,7 @@ import { cleanHours, PRICE } from '../../lib/newpage-pricing.js'
 import { createOutlookEvent } from '../../lib/outlook.js'
 import { createGoogleCalendarEvent } from '../../lib/google-calendar.js'
 import {
-  COMPASS_SYSTEM, COMPASS_TASKS, cleanCompass,
+  COMPASS_SYSTEM, COMPASS_TASKS, cleanCompass, COMPASS_LAST_STEP, addCompassIdeas,
   clipText,
   SECTION_SYSTEM, SECTIONS_SCHEMA, SECTION_KINDS, cleanSections, cleanFields, memberContext
 } from '../../lib/newpage-tools.js'
@@ -849,6 +849,8 @@ export default async function handler(req, res) {
       if (!rateLimit(req, res, { max: 40, windowMs: 60 * 60 * 1000, key: `np-coach-${member.id}` })) return
       const text = clip(b.message, 2000)
       if (!text) return res.status(400).json({ error: 'Type a message first.' })
+      // What they have open beside the chat (only the Compass step, for now).
+      const where = Number.isInteger(b.where?.compassStep) && b.where.compassStep >= 0 && b.where.compassStep <= COMPASS_LAST_STEP ? { compassStep: b.where.compassStep } : null
       let vault
       try { vault = await writeVault(member) } catch (err) { return res.status(err.status || 500).json({ error: err.message }) }
       const store = rows => supabase.from('newpage_messages').insert(rows.map(r => ({ member_id: member.id, coach, role: r.role, content: sealText(vault, 'msg', r.content) })))
@@ -870,10 +872,11 @@ export default async function handler(req, res) {
       const current = steerAll[coach] && Date.now() - new Date(steerAll[coach].at).getTime() < 3 * 24 * 60 * 60 * 1000 ? steerAll[coach] : null
       const system = coachSystem({
         member, tasks: data.tasks, memory: data.memory, compass: cp ? cleanCompass(cp) : null, coach,
-        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline, demo: isDemo(member),
+        about: cleanAbout(aboutRaw), resume: [clipText(profile?.text, 2600), tailorNote(recent.data)].filter(Boolean).join('\n\n'), learn, privacy: member.privacy || null, steer: current?.steer || [], pipeline: data.pipeline, demo: isDemo(member), where,
         // Same stage as load() found, with the recent tailored resumes' match tables added for the "same gap" pattern.
         apply: withMatches(data, (recent.data || []).map(d => d.content?.tailored?.match).filter(Boolean))
       })
+      const compassAdded = []
       const tools = {
         run: async (name, input) => {
           if (name === 'save_memory') {
@@ -887,6 +890,14 @@ export default async function handler(req, res) {
             await supabase.from('newpage_memory').insert({ member_id: member.id, note: sealText(vault, 'mem', note) })
             data.memory.push({ note })
             return 'Saved.'
+          }
+          if (name === 'add_compass_ideas') {
+            const c = cleanCompass(cp || {})
+            const added = addCompassIdeas(c, input.ideas)
+            if (!added.length) return c.ideas.length >= 30 ? 'Their idea list is full (30). Suggest they remove one first.' : 'Those are already on their list.'
+            await setTool(member, 'compass', c)
+            compassAdded.push(...added)
+            return `Added to their Compass ideas: ${added.join('; ')}.`
           }
           if (name === 'add_task') {
             const title = clip(input.title, 200)
@@ -960,7 +971,7 @@ export default async function handler(req, res) {
           await setTool(member, 'steer', next)
         } catch (err) { console.error('Sky self-check failed (reply was still sent):', err.message) }
       }
-      return res.json({ ...(await me(member, coach)), usedTools: reply.used.map(u => u.name), ...(check ? { selfCheck: { kind, onTrack: check.on_track } } : {}) })
+      return res.json({ ...(await me(member, coach)), usedTools: reply.used.map(u => u.name), compassAdded, ...(check ? { selfCheck: { kind, onTrack: check.on_track } } : {}) })
     }
 
     default:

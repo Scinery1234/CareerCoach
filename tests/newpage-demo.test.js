@@ -87,7 +87,7 @@ test('the demo prompt only applies to a demo, and says what matters', () => {
   const off = coachSystem({ member: { ...member, source: 'tools', name: 'Ana' }, tasks: [], memory: [] })
   for (const line of DEMO_INTAKE) assert.ok(on.includes(line))
   assert.match(on, /one short question at a time/)
-  assert.match(on, /do not mention the Compass/)
+  assert.match(on, /not using the Compass, do not mention it/)
   assert.match(on, /never save a guess/)
   assert.match(on, /Never pressure them to join/)
   assert.ok(!off.includes('THIS IS A FREE DEMO'))
